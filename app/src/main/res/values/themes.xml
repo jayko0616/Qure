@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Parented on the platform Material theme so the app does not need the
+         com.google.android.material library just to have a window background. Compose paints
+         everything above this; the only job here is the pre-Compose window and the system bars. -->
+    <style name="Theme.Qure" parent="android:Theme.Material.NoActionBar">
+        <!-- Dark from the very first frame: a white flash before the camera preview attaches is
+             the difference between "instant" and "janky" on a scanner. -->
+        <item name="android:windowBackground">@color/qure_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- The stock-camera prompt. Translucent so the viewfinder underneath stays visible, which is
+         what makes the prompt read as an overlay on the camera rather than a jump to another app.
+         windowIsTranslucent also means an activity that finishes before composing shows nothing at
+         all, which is what keeps the pass-through path invisible. -->
+    <style name="Theme.Qure.Transparent" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

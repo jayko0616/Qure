@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/app/build/
+/app/release/
+
+# 데모 녹화본. 저장소에 커밋하면 히스토리에 영구히 남아 모든 clone이 이걸 끌고 다닙니다.
+# 배포가 필요하면 GitHub Releases에 첨부하세요.
+*.mp4
+*.mov

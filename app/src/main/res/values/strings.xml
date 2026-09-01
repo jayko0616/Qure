@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Qure</string>
+
+    <!-- 카메라 권한 -->
+    <string name="perm_title">카메라 권한이 필요합니다</string>
+    <string name="perm_body">QR 코드를 인식하려면 카메라 접근 권한이 필요합니다. 촬영하거나 저장하지 않으며, 화면에 보이는 QR만 그 자리에서 읽습니다.</string>
+    <string name="perm_cta">권한 허용하기</string>
+    <string name="perm_body_settings">권한이 거부되어 있어 시스템 설정에서 직접 허용해야 합니다. 설정 → 권한 → 카메라를 켜주세요.</string>
+    <string name="perm_cta_settings">설정 열기</string>
+
+    <!-- 스캐너 -->
+    <string name="scanner_hint">QR 코드를 비추면 자동으로 인식합니다</string>
+    <string name="scanner_hint_found">QR을 인식했습니다</string>
+    <string name="manual_button">이 QR 검사하기</string>
+    <string name="manual_button_idle">QR을 비춰주세요</string>
+    <string name="prompt_title">이 QR을 검사하시겠습니까?</string>
+    <string name="prompt_not_opened">아직 열지 않았습니다. 검사 후에 결정하세요.</string>
+    <string name="prompt_yes">예, 검사할게요</string>
+    <string name="prompt_no">아니오</string>
+    <string name="prompt_open_directly">검사 없이 열기</string>
+
+    <!-- 결과 -->
+    <string name="result_host">접속하게 될 주소</string>
+    <string name="result_no_host">도메인 없음</string>
+    <string name="result_raw">QR에 담긴 원문</string>
+    <string name="result_kind">유형</string>
+    <string name="result_incomplete">일부 검사 규칙이 실행되지 않아 결과가 불완전합니다.</string>
+    <string name="kind_http_url">웹 주소</string>
+    <string name="kind_wifi">Wi-Fi 접속 정보</string>
+    <string name="kind_tel">전화번호</string>
+    <string name="kind_sms">문자 발송</string>
+    <string name="kind_mailto">메일 주소</string>
+    <string name="kind_geo">위치 좌표</string>
+    <string name="kind_app_intent">앱 실행 코드</string>
+    <string name="kind_other_scheme">알 수 없는 형식</string>
+    <string name="kind_plain_text">일반 텍스트</string>
+    <string name="result_signals">발견된 신호</string>
+    <string name="result_no_signals">이 단계에서 확인 가능한 위험 신호는 없습니다.</string>
+    <string name="result_back">스캔으로 돌아가기</string>
+    <string name="result_engine_notice">지금은 QR에 적힌 내용만으로 판단하는 오프라인 1차 검사입니다. 단축 URL의 최종 목적지 추적과 도메인 평판 조회는 다음 단계에서 연결됩니다.</string>
+
+    <string name="verdict_sub_safe">다만 아래 원문을 직접 확인하고 판단하세요.</string>
+    <string name="verdict_sub_caution">아래 신호를 확인한 뒤 결정하세요.</string>
+    <string name="verdict_sub_danger">이 주소는 열지 않는 것을 권합니다.</string>
+    <string name="verdict_failed">검사를 완료하지 못했습니다</string>
+    <string name="verdict_pending">검사 중…</string>
+
+    <!-- 기본 카메라 연동 온보딩 -->
+    <string name="onb_title">기본 카메라 앱과 연동하기</string>
+    <string name="cd_camera_link">기본 카메라 앱 연동 설정</string>
+    <string name="banner_title">기본 카메라로 찍은 QR은 아직 검사되지 않습니다</string>
+    <string name="banner_body">Qure를 기본 브라우저로 설정하면, 카메라에서 QR 링크를 누를 때 Qure가 먼저 확인합니다</string>
+    <string name="banner_cta">기본 브라우저로 설정</string>
+    <string name="banner_dismiss">배너 닫기</string>
+    <string name="onb_body">휴대폰의 기본 카메라로 QR을 찍었을 때도 Qure가 검사할 수 있습니다. 다만 안드로이드에는 \"카메라 앱을 들여다보는 권한\"이 없어서, 대신 Qure가 링크를 먼저 받도록 지정해야 합니다.</string>
+    <string name="onb_step1">기본 카메라로 QR을 비추면 카메라가 링크 버튼을 표시합니다</string>
+    <string name="onb_step2">그 버튼을 누르면 Qure가 먼저 받아 검사 여부를 묻습니다</string>
+    <string name="onb_step3">검사 후 안전하다고 판단되면 그때 브라우저로 넘깁니다</string>
+    <string name="onb_tradeoff">이렇게 하면 모든 링크가 Qure를 한 번 거칩니다. QR에서 온 링크가 아니면 화면 없이 즉시 브라우저로 통과시키므로, 평소 웹 사용에는 변화가 없습니다.</string>
+    <string name="onb_enable">Qure를 기본 브라우저로 설정</string>
+    <string name="onb_skip">닫기</string>
+    <string name="onb_enabled">연동되었습니다</string>
+    <string name="onb_continue">스캐너로 돌아가기</string>
+</resources>
