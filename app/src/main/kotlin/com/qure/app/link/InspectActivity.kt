@@ -26,6 +26,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +40,10 @@ import androidx.compose.ui.unit.dp
 import com.qure.app.BuildConfig
 import com.qure.app.R
 import com.qure.app.signature.SignatureEngine
+import androidx.compose.ui.platform.LocalContext
+import com.qure.app.blacklist.LocalBlacklistStore
+import com.qure.app.blacklist.UserBlacklistSignature
+import com.qure.app.signature.Signatures
 import com.qure.app.domain.ParsedPayload
 import com.qure.app.domain.UrlParser
 import com.qure.app.screen.ResultScreen
@@ -112,7 +119,16 @@ private fun InspectFlow(
     onOpenDirectly: () -> Unit,
     onDone: () -> Unit,
 ) {
-    val analyzer = remember { SignatureEngine() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // The stock-camera path must honour the user's lists too, or the same code would be judged
+    // differently depending on which way it was scanned — and it must be able to ADD to them, or
+    // the user would have to remember the address and go find the app.
+    val store = remember(context) { LocalBlacklistStore(context) }
+    val blacklists by store.lists.collectAsStateWithLifecycle()
+    val analyzer = remember(store) {
+        SignatureEngine(Signatures.rules + UserBlacklistSignature { store.allEntries() })
+    }
     var inspected by remember { mutableStateOf(false) }
 
     if (!inspected) {
@@ -130,7 +146,18 @@ private fun InspectFlow(
         }
     } else {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            ResultScreen(parsed = parsed, analyzer = analyzer, onBack = onDone)
+            ResultScreen(
+                parsed = parsed,
+                riskAnalyzer = analyzer,
+                onBack = onDone,
+                onOpen = onOpenDirectly,
+                backLabel = stringResource(R.string.result_close),
+                blacklists = blacklists,
+                onAddToList = { id, v -> scope.launch { store.addEntry(id, v) } },
+                onCreateListAndAdd = { name, v ->
+                    scope.launch { store.addEntry(store.createList(name), v) }
+                },
+            )
         }
     }
 }

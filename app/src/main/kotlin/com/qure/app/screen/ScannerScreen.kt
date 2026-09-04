@@ -13,6 +13,8 @@ import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -36,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -47,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,14 +85,20 @@ import com.qure.app.BuildConfig
 import com.qure.app.R
 import com.qure.app.camera.QrScanAnalyzer
 import com.qure.app.domain.QrDetection
+import com.qure.app.domain.QrRiskAnalyzer
+import com.qure.app.domain.RiskLevel
 import com.qure.app.domain.UrlParser
+import com.qure.app.domain.Verdict
 import com.qure.app.link.LinkHandoff
 import com.qure.app.link.defaultBrowserRequestIntent
 import com.qure.app.link.isDefaultBrowser
 import com.qure.app.ui.theme.QrYellow
+import com.qure.app.ui.theme.RiskDanger
+import com.qure.app.ui.theme.RiskSafe
 import com.qure.app.ui.theme.highlightHost
 import com.qure.app.ui.theme.middleEllipsis
 import java.util.concurrent.Executors
+import kotlinx.coroutines.delay
 import kotlin.math.hypot
 
 /**
@@ -127,8 +137,13 @@ private const val handoverMargin = 1.25f
  */
 @Composable
 fun ScannerScreen(
+    riskAnalyzer: QrRiskAnalyzer,
     onInspect: (QrDetection) -> Unit,
     onOpenCameraLink: () -> Unit,
+    onOpenMenu: () -> Unit,
+    onCreateBlacklist: () -> Unit,
+    /** Adds the payload currently outlined. Null-safe: the button is disabled with nothing tracked. */
+    onAddToBlacklist: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -154,6 +169,19 @@ fun ScannerScreen(
     // reliable moment to re-read it is on the way back to the foreground.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { linked = context.isDefaultBrowser() }
     var bannerVisible by rememberSaveable { mutableStateOf(true) }
+    var justAdded by remember { mutableStateOf(false) }
+    LaunchedEffect(justAdded) {
+        if (justAdded) { delay(2000); justAdded = false }
+    }
+
+    // The verdict for whatever is currently outlined, so the outline itself can carry it. Keyed on
+    // the payload, not the frame: the rules are pure and fast, but re-running them thirty times a
+    // second for an unchanged string would be pure waste.
+    //
+    // Only the current payload is kept. An unbounded cache here would grow for as long as the
+    // scanner is pointed at a wall of codes, and buys nothing — re-deciding costs microseconds.
+    var assessedValue by remember { mutableStateOf<String?>(null) }
+    var assessedLevel by remember { mutableStateOf<RiskLevel?>(null) }
 
     // The banner's button opens the system dialog directly. Routing it through an explanation
     // screen first made a one-tap decision into a three-tap errand; the detail screen is still
@@ -235,6 +263,21 @@ fun ScannerScreen(
         }
     }
 
+    val trackedValue = tracked?.rawValue
+    LaunchedEffect(trackedValue) {
+        if (trackedValue == null) {
+            assessedValue = null
+            assessedLevel = null
+            return@LaunchedEffect
+        }
+        val verdict = runCatching { riskAnalyzer.analyze(UrlParser.parse(trackedValue)) }.getOrNull()
+        assessedValue = trackedValue
+        // Failed and not-yet-assessed both land on null, which the outline paints amber. Neither is
+        // allowed to borrow the green that means "we looked and it was clean".
+        assessedLevel = (verdict as? Verdict.Assessed)?.level
+    }
+    val trackedLevel: RiskLevel? = if (assessedValue == trackedValue) assessedLevel else null
+
     // remember(context): ONE controller for the composition, so the camera never re-binds on
     // recomposition (which shows up as preview flicker and leaked bindings).
     val cameraController = remember(context) {
@@ -299,7 +342,7 @@ fun ScannerScreen(
 
         // Exactly one outline, following the chosen code. Same Box as the PreviewView, so
         // 1 Compose px == 1 PreviewView px and no scaling happens anywhere.
-        tracked?.let { QrOutline(it) }
+        tracked?.let { QrOutline(it, outlineColorFor(trackedLevel)) }
 
         // Top furniture in one column so the banner, the hint and the link button cannot overlap.
         if (prompted == null) {
@@ -307,7 +350,18 @@ fun ScannerScreen(
                 Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = onOpenMenu, modifier = Modifier.padding(4.dp)) {
+                        Icon(
+                            imageVector = Icons.Outlined.Menu,
+                            contentDescription = stringResource(R.string.menu_open),
+                            tint = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
                     // Permanent entry point, deliberately small. The dot marks that the
                     // stock-camera link is available but off — an affordance, not a nag.
                     Box(Modifier.padding(4.dp)) {
@@ -339,34 +393,40 @@ fun ScannerScreen(
                         ),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                     ) {
-                        Row(
-                            Modifier.padding(start = 14.dp, top = 10.dp, end = 6.dp, bottom = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    stringResource(R.string.banner_title),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White,
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    stringResource(R.string.banner_body),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.6f),
-                                )
-                            }
-                            TextButton(
-                                onClick = { roleLauncher.launch(context.defaultBrowserRequestIntent()) },
+                        // Text on its own row, actions beneath. Side by side, the Korean title wraps
+                        // to three lines and squeezes the button into an unreadable sliver.
+                        Column(Modifier.padding(start = 14.dp, top = 12.dp, end = 6.dp, bottom = 4.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top,
                             ) {
-                                Text(stringResource(R.string.banner_cta), color = QrYellow)
+                                Column(Modifier.weight(1f).padding(end = 4.dp)) {
+                                    Text(
+                                        stringResource(R.string.banner_title),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color.White,
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        stringResource(R.string.banner_body),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.6f),
+                                    )
+                                }
+                                IconButton(onClick = { bannerVisible = false }) {
+                                    Icon(
+                                        Icons.Outlined.Close,
+                                        contentDescription = stringResource(R.string.banner_dismiss),
+                                        tint = Color.White.copy(alpha = 0.5f),
+                                    )
+                                }
                             }
-                            IconButton(onClick = { bannerVisible = false }) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = stringResource(R.string.banner_dismiss),
-                                    tint = Color.White.copy(alpha = 0.5f),
-                                )
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(
+                                    onClick = { roleLauncher.launch(context.defaultBrowserRequestIntent()) },
+                                ) {
+                                    Text(stringResource(R.string.banner_cta), color = QrYellow)
+                                }
                             }
                         }
                     }
@@ -384,36 +444,61 @@ fun ScannerScreen(
                         .background(Color(0xFF0B0D10).copy(alpha = 0.55f), RoundedCornerShape(999.dp))
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                 )
+
+                // Blacklist actions live up here, away from the inspect button. Down at the bottom
+                // they sat beside the primary action and competed with it; the thumb reaches for
+                // one thing on this screen, and it should be "검사하기".
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    TextButton(onClick = onCreateBlacklist) {
+                        Text(
+                            stringResource(R.string.scanner_make_blacklist),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+                    TextButton(
+                        onClick = {
+                            tracked?.rawValue?.let { onAddToBlacklist(it); justAdded = true }
+                        },
+                        enabled = tracked != null,
+                    ) {
+                        Text(
+                            stringResource(R.string.scanner_add_blacklist),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (tracked != null) QrYellow else Color.White.copy(alpha = 0.35f),
+                        )
+                    }
+                }
+
+                if (justAdded) {
+                    Text(
+                        stringResource(R.string.scanner_added_toast),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = QrYellow,
+                        modifier = Modifier
+                            .background(Color(0xFF0B0D10).copy(alpha = 0.7f), RoundedCornerShape(999.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
             }
         }
 
-        // The screen's single button. It hides while the prompt is up, so there is never more than
-        // one call to action on screen at a time.
+        // Bottom stack: the two blacklist actions sit above the primary button as compact text
+        // buttons, so the inspect action stays the obvious thing to press.
         AnimatedVisibility(
             visible = prompted == null,
             enter = fadeIn(), exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            Button(
-                onClick = { tracked?.let(onInspect) },
-                enabled = tracked != null,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = QrYellow,
-                    contentColor = Color(0xFF201A00),
-                    // Explicit disabled colours. The Material defaults are low-contrast tints of
-                    // the surface, which vanish completely against a bright camera scene — the
-                    // button has to stay readable over whatever the lens happens to be pointed at.
-                    disabledContainerColor = Color(0xFF15181D).copy(alpha = 0.72f),
-                    disabledContentColor = Color.White.copy(alpha = 0.66f),
-                ),
-                modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(24.dp).height(56.dp),
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    stringResource(
-                        if (tracked == null) R.string.manual_button_idle else R.string.manual_button
-                    ),
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                PrimaryScanButton(tracked = tracked, onInspect = onInspect)
+                Spacer(Modifier.height(20.dp))
             }
         }
 
@@ -482,8 +567,47 @@ private fun pickBest(
     return if (score(best) > score(held) * handoverMargin) best else held
 }
 
+/**
+ * The outline carries the verdict, so the answer arrives before the user has to read anything.
+ *
+ * Amber is the default rather than a colour of its own: an unassessed or failed check is exactly as
+ * unresolved as an ambiguous one, and giving either of them green would be the app quietly claiming
+ * something it has not established.
+ */
 @Composable
-private fun QrOutline(detection: QrDetection) {
+private fun PrimaryScanButton(tracked: QrDetection?, onInspect: (QrDetection) -> Unit) {
+    Button(
+        onClick = { tracked?.let(onInspect) },
+        enabled = tracked != null,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = QrYellow,
+            contentColor = Color(0xFF201A00),
+            // Explicit disabled colours. The Material defaults are low-contrast tints of the
+            // surface, which vanish completely against a bright camera scene — the button has to
+            // stay readable over whatever the lens happens to be pointed at.
+            disabledContainerColor = Color(0xFF15181D).copy(alpha = 0.72f),
+            disabledContentColor = Color.White.copy(alpha = 0.66f),
+        ),
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+    ) {
+        Text(
+            stringResource(
+                if (tracked == null) R.string.manual_button_idle else R.string.manual_button
+            ),
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+private fun outlineColorFor(level: RiskLevel?): Color = when (level) {
+    RiskLevel.safe -> RiskSafe
+    RiskLevel.dangerous -> RiskDanger
+    RiskLevel.caution, null -> QrYellow
+}
+
+@Composable
+private fun QrOutline(detection: QrDetection, color: Color) {
+    val outline by animateColorAsState(color, tween(180), label = "outline")
     Canvas(Modifier.fillMaxSize()) {
         val corners = detection.cornersInViewPx
         // cornerPoints beat boundingBox: boundingBox is axis-aligned, so a code held at an angle
@@ -500,8 +624,8 @@ private fun QrOutline(detection: QrDetection) {
             for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
             close()
         }
-        drawPath(path, QrYellow.copy(alpha = 0.16f))
-        drawPath(path, QrYellow, style = Stroke(width = 5f))
+        drawPath(path, outline.copy(alpha = 0.18f))
+        drawPath(path, outline, style = Stroke(width = 5f))
 
         // Corner brackets read as "tracking" rather than "selected", and stay legible when the
         // quad is small or steeply angled.
@@ -511,11 +635,11 @@ private fun QrOutline(detection: QrDetection) {
             val prev = pts[(i + pts.size - 1) % pts.size]
             val next = pts[(i + 1) % pts.size]
             drawLine(
-                QrYellow, p, Offset(p.x + (next.x - p.x) * arm, p.y + (next.y - p.y) * arm),
+                outline, p, Offset(p.x + (next.x - p.x) * arm, p.y + (next.y - p.y) * arm),
                 strokeWidth = 12f, cap = StrokeCap.Round,
             )
             drawLine(
-                QrYellow, p, Offset(p.x + (prev.x - p.x) * arm, p.y + (prev.y - p.y) * arm),
+                outline, p, Offset(p.x + (prev.x - p.x) * arm, p.y + (prev.y - p.y) * arm),
                 strokeWidth = 12f, cap = StrokeCap.Round,
             )
         }

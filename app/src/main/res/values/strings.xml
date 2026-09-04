@@ -38,6 +38,13 @@
     <string name="result_signals">발견된 신호</string>
     <string name="result_no_signals">이 단계에서 확인 가능한 위험 신호는 없습니다.</string>
     <string name="result_back">스캔으로 돌아가기</string>
+    <string name="result_close">닫기</string>
+    <string name="result_open">열기</string>
+    <string name="result_open_acknowledged">확인했습니다, 열기</string>
+    <string name="result_open_anyway">위험을 감수하고 열기</string>
+    <string name="result_add_blacklist">블랙리스트에 추가하기</string>
+    <string name="result_pick_list">어느 리스트에 추가할까요?</string>
+    <string name="result_added_to">\'%1$s\'에 추가했습니다</string>
     <string name="result_engine_notice">지금은 QR에 적힌 내용만으로 판단하는 오프라인 1차 검사입니다. 단축 URL의 최종 목적지 추적과 도메인 평판 조회는 다음 단계에서 연결됩니다.</string>
 
     <string name="verdict_sub_safe">다만 아래 원문을 직접 확인하고 판단하세요.</string>
@@ -62,4 +69,60 @@
     <string name="onb_skip">닫기</string>
     <string name="onb_enabled">연동되었습니다</string>
     <string name="onb_continue">스캐너로 돌아가기</string>
+
+    <!-- 사이드 메뉴 -->
+    <string name="menu_open">메뉴 열기</string>
+    <string name="nav_back">뒤로</string>
+    <string name="menu_scanner">스캐너</string>
+    <string name="menu_profile">회원 프로필</string>
+    <string name="menu_mypage">마이페이지</string>
+    <string name="menu_camera_link">기본 카메라 연동</string>
+    <string name="menu_tagline">QR 피싱 검사</string>
+
+    <!-- 프로필 -->
+    <string name="profile_signed_out">로그인하지 않음</string>
+    <string name="profile_no_email">계정 없이도 모든 검사 기능을 쓸 수 있습니다</string>
+    <string name="profile_why">스캔한 내용은 기기 밖으로 나가지 않습니다. 로그인은 유료 플랜을 기기가 아니라 계정에 묶어두기 위한 것이며, 검사 기능을 쓰는 데는 필요하지 않습니다.</string>
+    <string name="profile_sign_in">로그인</string>
+    <string name="profile_sign_out">로그아웃</string>
+    <string name="profile_sign_in_note">아직 실제 인증이 연결되지 않았습니다. 지금은 이 기기에만 기록됩니다.</string>
+
+    <!-- 마이페이지 -->
+    <string name="mypage_current_plan">현재 플랜</string>
+    <string name="mypage_plan">요금제</string>
+    <string name="mypage_my_lists">나의 리스트</string>
+    <string name="mypage_list_count">%1$d개</string>
+    <string name="mypage_lists_note">위험하다고 판단한 QR을 직접 등록해두면, 다음에 같은 코드를 찍었을 때 위험으로 표시됩니다.</string>
+    <string name="plan_free">무료</string>
+    <string name="plan_pro">Pro</string>
+    <string name="feat_pending">준비 중</string>
+    <string name="feat_offline_rules">오프라인 규칙 기반 QR 검사</string>
+    <string name="feat_camera_link">기본 카메라 앱 연동</string>
+    <string name="feat_inert_display">위장 문자 무력화 표시</string>
+    <string name="feat_redirect">단축 URL 최종 목적지 추적</string>
+    <string name="feat_reputation">도메인 평판 조회</string>
+    <string name="feat_history">검사 기록 보관</string>
+    <string name="feat_live_signatures">시그니처 실시간 업데이트</string>
+    <string name="mypage_not_available">Pro 항목은 아직 구현되지 않았습니다. 네트워크 조회가 필요한 기능이라, 앱에 인터넷 권한을 추가하는 시점에 함께 열립니다.</string>
+
+    <!-- 블랙리스트 -->
+    <string name="blacklist_default_name">나의 블랙리스트</string>
+    <string name="blacklist_note">여기에 등록한 주소는 다음에 같은 QR을 찍었을 때 위험으로 표시됩니다.</string>
+    <string name="blacklist_empty">아직 리스트가 없습니다. 아래에서 만들어 보세요.</string>
+    <string name="blacklist_no_entries">등록된 항목이 없습니다.</string>
+    <string name="blacklist_new_list">새 리스트 만들기</string>
+    <string name="blacklist_list_name">리스트 이름</string>
+    <string name="blacklist_rename">이름 바꾸기</string>
+    <string name="blacklist_delete_list">리스트 삭제</string>
+    <string name="blacklist_add_entry">항목 추가</string>
+    <string name="blacklist_edit_entry">항목 수정</string>
+    <string name="blacklist_remove_entry">항목 제거</string>
+    <string name="blacklist_entry_hint">주소 또는 도메인 (예: evil.example)</string>
+    <string name="blacklist_confirm">저장</string>
+    <string name="blacklist_cancel">취소</string>
+
+    <!-- 스캐너 하단 -->
+    <string name="scanner_make_blacklist">블랙리스트 만들기</string>
+    <string name="scanner_add_blacklist">블랙리스트에 추가하기</string>
+    <string name="scanner_added_toast">블랙리스트에 추가했습니다</string>
 </resources>

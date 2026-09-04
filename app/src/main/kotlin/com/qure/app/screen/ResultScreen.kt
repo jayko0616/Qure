@@ -20,12 +20,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextAlign
+import com.qure.app.blacklist.Blacklist
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -58,13 +68,22 @@ import com.qure.app.ui.theme.highlightHost
 @Composable
 fun ResultScreen(
     parsed: ParsedPayload,
-    analyzer: QrRiskAnalyzer,
+    riskAnalyzer: QrRiskAnalyzer,
     onBack: () -> Unit,
+    /** Null when the payload is not something a browser can open (Wi-Fi credentials, plain text…). */
+    onOpen: (() -> Unit)? = null,
+    backLabel: String = stringResource(R.string.result_back),
+    blacklists: List<Blacklist> = emptyList(),
+    onAddToList: (listId: String, value: String) -> Unit = { _, _ -> },
+    onCreateListAndAdd: (name: String, value: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
+    var picking by remember { mutableStateOf(false) }
+    var namingList by remember { mutableStateOf(false) }
+    var addedTo by remember { mutableStateOf<String?>(null) }
     // Failure is caught here and mapped to Verdict.Failed, never to a default-safe value.
     val verdict by produceState<Verdict>(initialValue = Verdict.NotAssessed, parsed) {
-        value = runCatching { analyzer.analyze(parsed) }
+        value = runCatching { riskAnalyzer.analyze(parsed) }
             .getOrElse { Verdict.Failed(it.message ?: it::class.simpleName.orEmpty()) }
     }
 
@@ -82,11 +101,194 @@ fun ResultScreen(
             Spacer(Modifier.height(16.dp))
             EngineNotice()
             Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-            ) { Text(stringResource(R.string.result_back)) }
+            Actions(
+                verdict = verdict,
+                canOpen = onOpen != null && parsed.isWebLink,
+                backLabel = backLabel,
+                addedTo = addedTo,
+                onOpen = onOpen ?: {},
+                onBack = onBack,
+                onAddToBlacklist = {
+                    // No lists yet? Go straight to naming one. Showing an empty picker first would
+                    // be a dead end wearing the costume of a choice.
+                    if (blacklists.isEmpty()) namingList = true else picking = true
+                },
+            )
             Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (picking) {
+        ListPickerDialog(
+            lists = blacklists,
+            onPick = { list ->
+                onAddToList(list.id, parsed.raw)
+                addedTo = list.name
+                picking = false
+            },
+            onCreateNew = { picking = false; namingList = true },
+            onDismiss = { picking = false },
+        )
+    }
+    if (namingList) {
+        NameListDialog(
+            onConfirm = { name ->
+                onCreateListAndAdd(name, parsed.raw)
+                addedTo = name
+                namingList = false
+            },
+            onDismiss = { namingList = false },
+        )
+    }
+}
+
+/**
+ * The one place the user acts.
+ *
+ * Opening the link has to be possible — an inspection the user cannot act on is a dead end, and a
+ * tool that strands people trains them to stop using it. But the two choices are not weighted
+ * equally at every risk level. On a dangerous verdict the primary, thumb-sized button is the one
+ * that takes you back, and opening anyway is a plain text button that names what it is. That is a
+ * deliberate asymmetry, not a hidden control: both actions are always visible and always one tap.
+ *
+ * A failed or not-yet-run analysis is treated exactly like caution. It is emphatically not treated
+ * like safe, because nothing has actually cleared the link.
+ */
+@Composable
+private fun ListPickerDialog(
+    lists: List<Blacklist>,
+    onPick: (Blacklist) -> Unit,
+    onCreateNew: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.result_pick_list)) },
+        text = {
+            Column {
+                lists.forEach { list ->
+                    TextButton(
+                        onClick = { onPick(list) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            "${list.name}  (${list.entries.size})",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCreateNew) { Text(stringResource(R.string.blacklist_new_list)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.blacklist_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun NameListDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.blacklist_new_list)) },
+        text = {
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                label = { Text(stringResource(R.string.blacklist_list_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) {
+                Text(stringResource(R.string.blacklist_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.blacklist_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun Actions(
+    verdict: Verdict,
+    canOpen: Boolean,
+    backLabel: String,
+    addedTo: String?,
+    onOpen: () -> Unit,
+    onBack: () -> Unit,
+    onAddToBlacklist: () -> Unit,
+) {
+    val level = (verdict as? Verdict.Assessed)?.level
+    Column(Modifier.fillMaxWidth().navigationBarsPadding()) {
+        when {
+            !canOpen -> {
+                Button(onClick = onBack, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                    Text(backLabel)
+                }
+            }
+
+            level == RiskLevel.safe -> {
+                Button(
+                    onClick = onOpen,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = RiskSafe, contentColor = Color(0xFF04210E),
+                    ),
+                ) { Text(stringResource(R.string.result_open), style = MaterialTheme.typography.titleMedium) }
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(backLabel) }
+            }
+
+            level == RiskLevel.dangerous -> {
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text(backLabel, style = MaterialTheme.typography.titleMedium) }
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.result_open_anyway),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // caution, analysis failed, or still running — same treatment: openable, but the label
+            // says the user is the one deciding.
+            else -> {
+                OutlinedButton(
+                    onClick = onOpen,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) { Text(stringResource(R.string.result_open_acknowledged)) }
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(backLabel) }
+            }
+        }
+
+        // Available at every risk level. The verdict the engine reached is an opinion; the user
+        // deciding this particular code is bad is a fact, and the app should take it either way.
+        if (addedTo == null) {
+            TextButton(onClick = onAddToBlacklist, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.result_add_blacklist),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Text(
+                stringResource(R.string.result_added_to, addedTo),
+                style = MaterialTheme.typography.labelMedium,
+                color = RiskCaution,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
