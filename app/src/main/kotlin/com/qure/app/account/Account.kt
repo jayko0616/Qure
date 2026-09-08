@@ -16,16 +16,32 @@ enum class PlanTier { free, pro }
 @Immutable
 data class UserProfile(
     val signedIn: Boolean = false,
+    /** The login id. Null while signed out. */
+    val userId: String? = null,
     val displayName: String? = null,
-    val email: String? = null,
     val tier: PlanTier = PlanTier.free,
 )
+
+/** Why a sign-in or sign-up did not go through. Mapped to user-facing text in the UI layer. */
+enum class AuthError {
+    emptyField,
+    invalidCredentials,
+    duplicateId,
+    weakPassword,
+    codeNotRequested,
+    wrongCode,
+}
+
+sealed interface AuthResult {
+    data object Success : AuthResult
+    data class Failure(val error: AuthError) : AuthResult
+}
 
 /**
  * The seam for real authentication and billing.
  *
- * Milestone 1 ships [LocalAccountStore], which keeps a plan choice on the device and nothing else.
- * Dropping in a real backend means implementing this interface; no screen needs to change.
+ * [LocalAccountStore] keeps everything on the device for now. Dropping in a real backend means
+ * implementing this interface; no screen needs to change.
  *
  * A deliberate note for whoever wires up billing: entitlement must be checked server-side before it
  * unlocks anything that costs money to run. A tier held only on the device is a display hint, and
@@ -34,7 +50,18 @@ data class UserProfile(
  */
 interface AccountRepository {
     val profile: StateFlow<UserProfile>
-    suspend fun signIn()
+
+    suspend fun signIn(userId: String, password: String): AuthResult
+
+    suspend fun signUp(name: String, userId: String, password: String, code: String): AuthResult
+
+    /**
+     * Issues a fresh verification code for the sign-up in progress and returns it.
+     * Until an SMS or e-mail channel exists, the caller shows it on screen labelled as a test code.
+     */
+    fun requestVerificationCode(): String
+
     suspend fun signOut()
+
     suspend fun setTier(tier: PlanTier)
 }

@@ -44,7 +44,13 @@ class UserBlacklistSignature(
         }
 
         return if (matched) {
-            listOf(Signal(id, Severity.danger, "내가 등록한 블랙리스트에 있는 주소입니다"))
+            listOf(
+                Signal(
+                    id, Severity.danger,
+                    title = "내 블랙리스트",
+                    detail = "내가 직접 등록한 블랙리스트에 있는 주소입니다",
+                ),
+            )
         } else emptyList()
     }
 

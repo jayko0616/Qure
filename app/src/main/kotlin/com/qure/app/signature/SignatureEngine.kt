@@ -5,6 +5,7 @@ import com.qure.app.domain.QrRiskAnalyzer
 import com.qure.app.domain.RiskLevel
 import com.qure.app.domain.Severity
 import com.qure.app.domain.Signal
+import com.qure.app.domain.Stage
 import com.qure.app.domain.Verdict
 import kotlinx.coroutines.coroutineScope
 
@@ -20,6 +21,8 @@ import kotlinx.coroutines.coroutineScope
  */
 class SignatureEngine(
     private val signatures: List<Signature> = Signatures.rules,
+    /** Which pass this engine represents. Only affects the score, never the level. */
+    private val stage: Stage = Stage.s1,
 ) : QrRiskAnalyzer {
 
     override suspend fun analyze(payload: ParsedPayload): Verdict = coroutineScope {
@@ -50,17 +53,30 @@ class SignatureEngine(
             .distinctBy { it.id }
             .sortedByDescending { it.severity.ordinal }
 
+        // ── The colour. Worst severity present, nothing else. ──────────────────────────────────
+        // This `when` takes exactly one input: the most severe signal. No score, count, or sum is
+        // allowed to reach it. A points system would let a single decisive danger (the "@"
+        // disguise, a blacklisted host) be outvoted by the absence of company, or let several
+        // warnings add up to red. Either would break the promise each severity makes on its own.
         val level = when (ordered.maxByOrNull { it.severity.ordinal }?.severity) {
             Severity.danger -> RiskLevel.dangerous
             Severity.warn, Severity.info -> RiskLevel.caution
             null -> RiskLevel.safe
         }
 
+        // ── The number. Computed FROM the level, after it is final. ────────────────────────────
+        // Nothing below this line feeds back into the `when` above. The rubric only ever places a
+        // score inside the band the level already chose.
+        val score = ScoreRubric.score(level, ordered, failed, stage)
+
         Verdict.Assessed(
             level = level,
             headline = headlineFor(level, failed.isNotEmpty()),
             signals = ordered,
+            score = score,
+            stage = stage,
             failedSignatures = failed,
+            ranSignatures = active.map { it.id }.filterNot { it in failed },
         )
     }
 

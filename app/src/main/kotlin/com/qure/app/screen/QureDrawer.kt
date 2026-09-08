@@ -1,11 +1,13 @@
 package com.qure.app.screen
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Link
@@ -18,6 +20,7 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -50,6 +53,32 @@ fun QureDrawerSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 16.dp),
             )
+
+            // Who is signed in, right where the menu opens. Signed-out shows nothing extra: the
+            // profile item below is the way in, and an empty "not signed in" line would only nag.
+            if (profile.signedIn) {
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    Modifier.padding(start = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        profile.displayName ?: profile.userId.orEmpty(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    TierChip(profile.tier)
+                }
+                profile.userId?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 2.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(20.dp))
 
             Item(DrawerDestination.scanner, Icons.Outlined.QrCodeScanner, R.string.menu_scanner, current, onSelect)

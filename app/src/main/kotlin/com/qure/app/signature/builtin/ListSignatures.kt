@@ -22,7 +22,13 @@ class BlockedHostSignature(private val hosts: Set<String>) : Signature {
         val host = payload.host ?: return emptyList()
         val hit = hosts.any { host == it || host.endsWith(".$it") }
         return if (hit) {
-            listOf(Signal(id, Severity.danger, "알려진 악성 주소 목록에 있습니다"))
+            listOf(
+                Signal(
+                    id, Severity.danger,
+                    title = "알려진 악성 주소",
+                    detail = "알려진 악성 주소 목록에 있는 도메인입니다",
+                ),
+            )
         } else emptyList()
     }
 }
@@ -34,21 +40,33 @@ class BlockedPatternSignature(private val patterns: Set<String>) : Signature {
         val raw = payload.raw.lowercase()
         val hit = patterns.firstOrNull { it.isNotBlank() && raw.contains(it.lowercase()) }
         return if (hit != null) {
-            listOf(Signal(id, Severity.danger, "알려진 악성 패턴이 발견되었습니다"))
+            listOf(
+                Signal(
+                    id, Severity.danger,
+                    title = "알려진 악성 패턴",
+                    detail = "알려진 피싱 캠페인에서 쓰인 문자열이 들어 있습니다",
+                ),
+            )
         } else emptyList()
     }
 }
 
 /**
  * Shorteners hide the destination, which is the whole point of using one in a quishing campaign.
- * Note this is a warning, not a verdict: milestone 2 resolves the redirect and judges the target.
+ * Note this is a warning, not a verdict: the deep pass resolves the redirect and judges the target.
  */
 class ShortenerSignature(private val shorteners: Set<String>) : Signature {
     override val id = "shortener"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> {
         val host = payload.host ?: return emptyList()
         return if (host in shorteners) {
-            listOf(Signal(id, Severity.warn, "단축 URL이라 실제 목적지가 감춰져 있습니다"))
+            listOf(
+                Signal(
+                    id, Severity.warn,
+                    title = "단축 주소",
+                    detail = "실제 목적지를 알 수 없습니다",
+                ),
+            )
         } else emptyList()
     }
 }
@@ -58,7 +76,13 @@ class RiskyTldSignature(private val tlds: Set<String>) : Signature {
     override suspend fun inspect(payload: ParsedPayload): List<Signal> {
         val tld = payload.tld ?: return emptyList()
         return if (tld in tlds) {
-            listOf(Signal(id, Severity.info, ".$tld 는 악용 사례가 많은 도메인입니다"))
+            listOf(
+                Signal(
+                    id, Severity.info,
+                    title = "위험 TLD (.$tld)",
+                    detail = "악용 사례가 많은 최상위 도메인입니다",
+                ),
+            )
         } else emptyList()
     }
 }
@@ -69,8 +93,8 @@ class RiskyTldSignature(private val tlds: Set<String>) : Signature {
  *
  * Matching is on whole tokens, never on raw substrings. A substring test looks fine until you
  * notice that "kakao" occurs inside "kakaobank", at which point the rule reports the REAL
- * kakaobank.com as an impostor of 카카오 — a false positive on a bank's own domain, which is about
- * the worst output an anti-phishing tool can produce. Hosts are split on dots and then on any
+ * kakaobank.com as an impostor of 카카오 — a false positive on the bank itself, which is about the
+ * worst output an anti-phishing tool can produce. Hosts are split on dots and then on any
  * non-alphanumeric, and the brand label has to equal one of the resulting tokens.
  */
 class BrandLookalikeSignature(private val brands: List<Brand>) : Signature {
@@ -87,7 +111,11 @@ class BrandLookalikeSignature(private val brands: List<Brand>) : Signature {
         } ?: return emptyList()
 
         return listOf(
-            Signal(id, Severity.danger, "${hit.name}을(를) 사칭한 주소로 보입니다 (진짜 주소: ${hit.domain})"),
+            Signal(
+                id, Severity.danger,
+                title = "브랜드 사칭",
+                detail = "${hit.name}을(를) 사칭한 주소로 보입니다 (진짜 주소: ${hit.domain})",
+            ),
         )
     }
 

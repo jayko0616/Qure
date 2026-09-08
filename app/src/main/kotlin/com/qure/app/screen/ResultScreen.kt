@@ -2,6 +2,7 @@ package com.qure.app.screen
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,40 +20,46 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.style.TextAlign
-import com.qure.app.blacklist.Blacklist
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.qure.app.R
+import com.qure.app.blacklist.Blacklist
 import com.qure.app.domain.ParsedPayload
 import com.qure.app.domain.PayloadKind
 import com.qure.app.domain.QrRiskAnalyzer
 import com.qure.app.domain.RiskLevel
 import com.qure.app.domain.Severity
+import com.qure.app.domain.Signal
 import com.qure.app.domain.UrlParser
 import com.qure.app.domain.Verdict
+import com.qure.app.signature.ScoreRubric
 import com.qure.app.ui.theme.RiskCaution
 import com.qure.app.ui.theme.RiskDanger
 import com.qure.app.ui.theme.RiskSafe
@@ -64,6 +71,10 @@ import com.qure.app.ui.theme.highlightHost
  * Everything on this screen is inert text. Nothing here is tappable through to the payload, by
  * design: an anti-phishing app that offers a one-tap "open it anyway" on the same screen as the
  * warning has just built a better phishing funnel than the attacker had.
+ *
+ * What the screen shows about the score: the total, and nothing else. Findings are sentences,
+ * ordered by severity. The order reveals rank, which cannot be hidden and does not need to be; it
+ * never reveals distance, so the order alone cannot be used to find the edge of green.
  */
 @Composable
 fun ResultScreen(
@@ -97,7 +108,7 @@ fun ResultScreen(
             Spacer(Modifier.height(24.dp))
             PayloadCard(parsed)
             Spacer(Modifier.height(16.dp))
-            SignalsCard(verdict)
+            FindingsCard(verdict, parsed)
             Spacer(Modifier.height(16.dp))
             EngineNotice()
             Spacer(Modifier.height(24.dp))
@@ -142,6 +153,201 @@ fun ResultScreen(
     }
 }
 
+// ── header ─────────────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun verdictColor(verdict: Verdict): Color = when (verdict) {
+    is Verdict.Assessed -> when (verdict.level) {
+        RiskLevel.safe -> RiskSafe
+        RiskLevel.caution -> RiskCaution
+        RiskLevel.dangerous -> RiskDanger
+    }
+    // Failed and not-yet-run are exactly as unresolved as caution, and borrow its colour. Neither
+    // is ever allowed to borrow green.
+    is Verdict.Failed -> RiskCaution
+    Verdict.NotAssessed -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+@Composable
+private fun VerdictHeader(verdict: Verdict) {
+    val color = verdictColor(verdict)
+    val title = when (verdict) {
+        is Verdict.Assessed -> stringResource(
+            when (verdict.level) {
+                RiskLevel.safe -> R.string.level_safe
+                RiskLevel.caution -> R.string.level_caution
+                RiskLevel.dangerous -> R.string.level_danger
+            },
+        )
+        is Verdict.Failed -> stringResource(R.string.verdict_failed)
+        Verdict.NotAssessed -> stringResource(R.string.verdict_pending)
+    }
+    val subtitle = when (verdict) {
+        is Verdict.Assessed -> when {
+            // A clean run that lost rules says so in the headline, not in a footnote.
+            verdict.level == RiskLevel.safe && verdict.failedSignatures.isNotEmpty() -> verdict.headline
+            verdict.level == RiskLevel.safe -> stringResource(R.string.verdict_sub_safe)
+            verdict.level == RiskLevel.caution -> stringResource(R.string.verdict_sub_caution)
+            else -> stringResource(R.string.verdict_sub_danger)
+        }
+        is Verdict.Failed -> verdict.reason
+        Verdict.NotAssessed -> ""
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ScoreBadge(
+            score = if (verdict is Verdict.NotAssessed) null else ScoreRubric.scoreOf(verdict),
+            color = color,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.headlineSmall, color = color)
+            if (subtitle.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** The one number the screen shows. Null while the analysis has not run yet. */
+@Composable
+private fun ScoreBadge(score: Int?, color: Color) {
+    Box(
+        Modifier
+            .size(72.dp)
+            .background(color.copy(alpha = 0.12f), CircleShape)
+            .border(3.dp, color, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = score?.toString() ?: "–",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
+    }
+}
+
+// ── findings ───────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Green lists what was checked; yellow and red list what was found.
+ *
+ * A green card with nothing on it looks like a check that never happened, so the rules that ran
+ * clean are shown as ticks. Yellow and red show each signal as a title with one line of specifics
+ * beneath it, worst first.
+ */
+@Composable
+private fun FindingsCard(verdict: Verdict, parsed: ParsedPayload) {
+    val assessed = verdict as? Verdict.Assessed
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            when {
+                assessed == null -> {
+                    Label(stringResource(R.string.result_pending_title))
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(
+                            if (verdict is Verdict.Failed) R.string.result_not_run
+                            else R.string.verdict_pending
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                assessed.level == RiskLevel.safe -> {
+                    Label(stringResource(R.string.result_checked_title))
+                    Spacer(Modifier.height(8.dp))
+                    val passed = passedChecks(assessed, parsed)
+                    if (passed.isEmpty()) {
+                        Text(
+                            stringResource(R.string.result_no_signals),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        passed.forEach { CheckRow(stringResource(it)) }
+                    }
+                }
+
+                else -> {
+                    Label(
+                        stringResource(
+                            if (assessed.level == RiskLevel.dangerous) R.string.result_danger_title
+                            else R.string.result_pending_title
+                        ),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    assessed.signals.forEach { SignalRow(it) }
+                }
+            }
+
+            // A run that lost rules is not a clean run. Saying so on the card keeps the omission
+            // visible next to the findings rather than buried in a log.
+            if (!assessed?.failedSignatures.isNullOrEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    stringResource(R.string.result_incomplete),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = RiskCaution,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CheckRow(text: String) {
+    Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Outlined.Check,
+            contentDescription = null,
+            tint = RiskSafe,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun SignalRow(signal: Signal) {
+    val dot = when (signal.severity) {
+        Severity.danger -> RiskDanger
+        Severity.warn -> RiskCaution
+        Severity.info -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.Top) {
+        Box(Modifier.padding(top = 7.dp).size(8.dp).background(dot, CircleShape))
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                signal.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            signal.detail?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// ── actions ────────────────────────────────────────────────────────────────────────────────────
+
 /**
  * The one place the user acts.
  *
@@ -154,67 +360,6 @@ fun ResultScreen(
  * A failed or not-yet-run analysis is treated exactly like caution. It is emphatically not treated
  * like safe, because nothing has actually cleared the link.
  */
-@Composable
-private fun ListPickerDialog(
-    lists: List<Blacklist>,
-    onPick: (Blacklist) -> Unit,
-    onCreateNew: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.result_pick_list)) },
-        text = {
-            Column {
-                lists.forEach { list ->
-                    TextButton(
-                        onClick = { onPick(list) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            "${list.name}  (${list.entries.size})",
-                            modifier = Modifier.weight(1f),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onCreateNew) { Text(stringResource(R.string.blacklist_new_list)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.blacklist_cancel)) }
-        },
-    )
-}
-
-@Composable
-private fun NameListDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var value by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.blacklist_new_list)) },
-        text = {
-            OutlinedTextField(
-                value = value,
-                onValueChange = { value = it },
-                label = { Text(stringResource(R.string.blacklist_list_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) {
-                Text(stringResource(R.string.blacklist_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.blacklist_cancel)) }
-        },
-    )
-}
-
 @Composable
 private fun Actions(
     verdict: Verdict,
@@ -293,38 +438,7 @@ private fun Actions(
     }
 }
 
-@Composable
-private fun VerdictHeader(verdict: Verdict) {
-    val (color, title, subtitle) = when (verdict) {
-        is Verdict.Assessed -> when (verdict.level) {
-            RiskLevel.safe -> Triple(RiskSafe, verdict.headline, stringResource(R.string.verdict_sub_safe))
-            RiskLevel.caution -> Triple(RiskCaution, verdict.headline, stringResource(R.string.verdict_sub_caution))
-            RiskLevel.dangerous -> Triple(RiskDanger, verdict.headline, stringResource(R.string.verdict_sub_danger))
-        }
-        is Verdict.Failed -> Triple(
-            RiskCaution, stringResource(R.string.verdict_failed), verdict.reason,
-        )
-        Verdict.NotAssessed -> Triple(
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            stringResource(R.string.verdict_pending), "",
-        )
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(12.dp).background(color, CircleShape))
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = color)
-            if (subtitle.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
+// ── payload ────────────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun PayloadCard(parsed: ParsedPayload) {
@@ -383,68 +497,12 @@ private fun kindLabelRes(kind: PayloadKind): Int = when (kind) {
 }
 
 @Composable
-private fun SignalsCard(verdict: Verdict) {
-    val assessed = verdict as? Verdict.Assessed
-    val signals = assessed?.signals.orEmpty()
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Label(stringResource(R.string.result_signals))
-            Spacer(Modifier.height(8.dp))
-            if (signals.isEmpty()) {
-                Text(
-                    stringResource(R.string.result_no_signals),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                signals.forEach { s ->
-                    Row(Modifier.padding(vertical = 6.dp)) {
-                        val c = when (s.severity) {
-                            Severity.danger -> RiskDanger
-                            Severity.warn -> RiskCaution
-                            Severity.info -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                        Box(Modifier.padding(top = 6.dp).size(8.dp).background(c, CircleShape))
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            s.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            }
-            // A run that lost rules is not a clean run. Saying so on the card keeps the omission
-            // visible next to the findings rather than buried in a log.
-            if (!assessed?.failedSignatures.isNullOrEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    stringResource(R.string.result_incomplete),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = RiskCaution,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun EngineNotice() {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-    ) {
-        Column {
-            Text(
-                stringResource(R.string.result_engine_notice),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    Text(
+        stringResource(R.string.result_engine_notice),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -453,5 +511,68 @@ private fun Label(text: String) {
         text,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+// ── blacklist dialogs ──────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ListPickerDialog(
+    lists: List<Blacklist>,
+    onPick: (Blacklist) -> Unit,
+    onCreateNew: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.result_pick_list)) },
+        text = {
+            Column {
+                lists.forEach { list ->
+                    TextButton(
+                        onClick = { onPick(list) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            "${list.name}  (${list.entries.size})",
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onCreateNew) { Text(stringResource(R.string.blacklist_new_list)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.blacklist_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun NameListDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.blacklist_new_list)) },
+        text = {
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                label = { Text(stringResource(R.string.blacklist_list_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) {
+                Text(stringResource(R.string.blacklist_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.blacklist_cancel)) }
+        },
     )
 }

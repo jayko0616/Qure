@@ -15,26 +15,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.res.stringResource
-import com.qure.app.blacklist.LocalBlacklistStore
-import com.qure.app.blacklist.UserBlacklistSignature
-import com.qure.app.screen.BlacklistScreen
-import com.qure.app.signature.Signatures
 import com.qure.app.account.LocalAccountStore
 import com.qure.app.account.PlanTier
+import com.qure.app.blacklist.LocalBlacklistStore
+import com.qure.app.blacklist.UserBlacklistSignature
 import com.qure.app.camera.CameraPermissionGate
 import com.qure.app.domain.QrDetection
 import com.qure.app.link.LinkHandoff
+import com.qure.app.screen.BlacklistScreen
 import com.qure.app.screen.CameraLinkScreen
 import com.qure.app.screen.DrawerDestination
+import com.qure.app.screen.LoginScreen
 import com.qure.app.screen.MyPageScreen
 import com.qure.app.screen.ProfileScreen
 import com.qure.app.screen.QureDrawerSheet
 import com.qure.app.screen.ResultScreen
 import com.qure.app.screen.ScannerScreen
+import com.qure.app.screen.SignUpScreen
 import com.qure.app.signature.SignatureEngine
+import com.qure.app.signature.Signatures
 import com.qure.app.ui.theme.QureTheme
 import kotlinx.coroutines.launch
 
@@ -56,12 +58,14 @@ private sealed interface Route {
     data class Result(val detection: QrDetection) : Route
     data object CameraLink : Route
     data object Profile : Route
+    data object Login : Route
+    data object SignUp : Route
     data object MyPage : Route
     data object Blacklist : Route
 }
 
 private fun Route.asDestination(): DrawerDestination = when (this) {
-    Route.Profile -> DrawerDestination.profile
+    Route.Profile, Route.Login, Route.SignUp -> DrawerDestination.profile
     Route.MyPage -> DrawerDestination.myPage
     Route.CameraLink -> DrawerDestination.cameraLink
     else -> DrawerDestination.scanner
@@ -168,9 +172,30 @@ private fun QureApp() {
                 BackHandler { route = Route.Scanner }
                 ProfileScreen(
                     profile = profile,
-                    onSignIn = { scope.launch { account.signIn() } },
+                    onGoLogin = { route = Route.Login },
+                    onGoSignUp = { route = Route.SignUp },
                     onSignOut = { scope.launch { account.signOut() } },
                     onBack = { route = Route.Scanner },
+                )
+            }
+
+            Route.Login -> {
+                BackHandler { route = Route.Profile }
+                LoginScreen(
+                    onSubmit = { id, pw -> account.signIn(id, pw) },
+                    onSuccess = { route = Route.Profile },
+                    onGoSignUp = { route = Route.SignUp },
+                    onBack = { route = Route.Profile },
+                )
+            }
+
+            Route.SignUp -> {
+                BackHandler { route = Route.Profile }
+                SignUpScreen(
+                    onRequestCode = { account.requestVerificationCode() },
+                    onSubmit = { name, id, pw, code -> account.signUp(name, id, pw, code) },
+                    onSuccess = { route = Route.Profile },
+                    onBack = { route = Route.Profile },
                 )
             }
 

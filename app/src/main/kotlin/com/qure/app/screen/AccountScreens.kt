@@ -56,7 +56,8 @@ import com.qure.app.ui.theme.RiskSafe
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
-    onSignIn: () -> Unit,
+    onGoLogin: () -> Unit,
+    onGoSignUp: () -> Unit,
     onSignOut: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -73,18 +74,24 @@ fun ProfileScreen(
                 )
             }
             Spacer(Modifier.width(16.dp))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(
                     profile.displayName ?: stringResource(R.string.profile_signed_out),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Spacer(Modifier.height(2.dp))
+                val id = profile.userId
                 Text(
-                    profile.email ?: stringResource(R.string.profile_no_email),
+                    if (profile.signedIn && id != null) stringResource(R.string.profile_user_id, id)
+                    else stringResource(R.string.profile_anonymous_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (profile.signedIn) {
+                Spacer(Modifier.width(8.dp))
+                TierChip(profile.tier)
             }
         }
 
@@ -98,12 +105,16 @@ fun ProfileScreen(
             }
         } else {
             Button(
-                onClick = onSignIn,
+                onClick = onGoLogin,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = QrYellow, contentColor = Color(0xFF201A00),
                 ),
             ) { Text(stringResource(R.string.profile_sign_in)) }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onGoSignUp, modifier = Modifier.fillMaxWidth().height(50.dp)) {
+                Text(stringResource(R.string.profile_sign_up))
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.profile_sign_in_note),
@@ -112,6 +123,23 @@ fun ProfileScreen(
             )
         }
     }
+}
+
+/** The plan, as a small pill. Yellow is reserved for Pro so the free state never looks "on". */
+@Composable
+internal fun TierChip(tier: PlanTier) {
+    val pro = tier == PlanTier.pro
+    Text(
+        stringResource(if (pro) R.string.plan_pro else R.string.plan_free),
+        style = MaterialTheme.typography.labelMedium,
+        color = if (pro) Color(0xFF201A00) else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .background(
+                if (pro) QrYellow else MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(999.dp),
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
 }
 
 /**
@@ -230,7 +258,7 @@ private fun MenuRow(
 // ── shared bits ────────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun AccountScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+internal fun AccountScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // Both insets are consumed OUTSIDE the scroll container. Applied inside, the scroll
         // viewport still extends under the navigation bar and the last control on the page ends up
