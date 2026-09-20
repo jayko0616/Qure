@@ -192,8 +192,7 @@ private fun QureApp() {
             Route.SignUp -> {
                 BackHandler { route = Route.Profile }
                 SignUpScreen(
-                    onRequestCode = { account.requestVerificationCode() },
-                    onSubmit = { name, id, pw, code -> account.signUp(name, id, pw, code) },
+                    onSubmit = { name, id, pw -> account.signUp(name, id, pw) },
                     onSuccess = { route = Route.Profile },
                     onBack = { route = Route.Profile },
                 )

@@ -2,26 +2,23 @@ package com.qure.app.screen
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,16 +26,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.qure.app.R
 import com.qure.app.link.defaultBrowserRequestIntent
 import com.qure.app.link.isDefaultBrowser
+import com.qure.app.ui.theme.Motion
 import com.qure.app.ui.theme.QrYellow
+import com.qure.app.ui.theme.Radius
+import com.qure.app.ui.theme.RiskSafe
+import com.qure.app.ui.theme.Spacing
 
 /**
  * Opt-in for reading QR codes that the PHONE'S OWN camera app finds.
@@ -51,6 +52,9 @@ import com.qure.app.ui.theme.QrYellow
  * that intent does not reach non-browser apps at all — unverified web links go straight to the
  * default browser with no chooser. So the switch is the default-browser role, and only the user can
  * flip it.
+ *
+ * The screen now carries a status chip and the shared top bar. Previously the only way out was the
+ * button at the very bottom of a scrolling page, which is a dead end on a small screen.
  */
 @Composable
 fun CameraLinkScreen(onClose: () -> Unit) {
@@ -65,84 +69,106 @@ fun CameraLinkScreen(onClose: () -> Unit) {
     // devices, so re-read the real state whenever we come back to the foreground.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { isDefault = context.isDefaultBrowser() }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
+    QureScaffold(
+        title = stringResource(R.string.menu_camera_link),
+        onBack = onClose,
+        bottomBar = {
+            if (isDefault) {
+                PrimaryButton(
+                    text = stringResource(R.string.onb_continue),
+                    onClick = onClose,
+                )
+            } else {
+                PrimaryButton(
+                    text = stringResource(R.string.onb_enable),
+                    onClick = { launcher.launch(context.defaultBrowserRequestIntent()) },
+                )
+            }
+        },
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 stringResource(R.string.onb_title),
                 style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.onb_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            StatusChip(isDefault)
+        }
 
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Step("1", stringResource(R.string.onb_step1))
-                    Spacer(Modifier.height(10.dp))
-                    Step("2", stringResource(R.string.onb_step2))
-                    Spacer(Modifier.height(10.dp))
-                    Step("3", stringResource(R.string.onb_step3))
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.onb_tradeoff),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            stringResource(R.string.onb_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-            if (isDefault) {
-                Text(
-                    stringResource(R.string.onb_enabled),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = QrYellow,
-                )
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = onClose,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = QrYellow, contentColor = Color(0xFF201A00),
-                    ),
-                ) { Text(stringResource(R.string.onb_continue)) }
-            } else {
-                Button(
-                    onClick = { launcher.launch(context.defaultBrowserRequestIntent()) },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = QrYellow, contentColor = Color(0xFF201A00),
-                    ),
-                ) { Text(stringResource(R.string.onb_enable)) }
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.onb_skip))
-                }
+        Spacer(Modifier.height(Spacing.xl))
+        Card(
+            shape = Radius.card,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Column(Modifier.padding(Spacing.lg)) {
+                Step(1, stringResource(R.string.onb_step1))
+                Spacer(Modifier.height(Spacing.md))
+                Step(2, stringResource(R.string.onb_step2))
+                Spacer(Modifier.height(Spacing.md))
+                Step(3, stringResource(R.string.onb_step3))
             }
         }
+
+        Spacer(Modifier.height(Spacing.lg))
+        NoteCard(stringResource(R.string.onb_tradeoff))
+    }
+}
+
+/** Says plainly whether the link is live, so the page is readable without parsing the button. */
+@Composable
+private fun StatusChip(on: Boolean) {
+    val tint by animateColorAsState(
+        if (on) RiskSafe else MaterialTheme.colorScheme.onSurfaceVariant,
+        tween(Motion.medium),
+        label = "statusTint",
+    )
+    Row(
+        Modifier
+            .background(tint.copy(alpha = 0.14f), Radius.pill)
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).background(tint, CircleShape))
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            stringResource(if (on) R.string.onb_status_on else R.string.onb_status_off),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = tint,
+        )
     }
 }
 
 @Composable
-private fun Step(n: String, text: String) {
+private fun Step(n: Int, text: String) {
     Row(verticalAlignment = Alignment.Top) {
-        Text(n, style = MaterialTheme.typography.titleSmall, color = QrYellow)
-        Spacer(Modifier.width(12.dp))
+        Box(
+            Modifier.size(24.dp).background(QrYellow.copy(alpha = 0.16f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                n.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = QrYellow,
+            )
+        }
+        Spacer(Modifier.width(Spacing.md))
         Text(
             text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 2.dp),
         )
     }
 }

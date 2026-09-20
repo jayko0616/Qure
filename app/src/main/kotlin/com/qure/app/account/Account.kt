@@ -28,8 +28,6 @@ enum class AuthError {
     invalidCredentials,
     duplicateId,
     weakPassword,
-    codeNotRequested,
-    wrongCode,
 }
 
 sealed interface AuthResult {
@@ -53,13 +51,17 @@ interface AccountRepository {
 
     suspend fun signIn(userId: String, password: String): AuthResult
 
-    suspend fun signUp(name: String, userId: String, password: String, code: String): AuthResult
-
     /**
-     * Issues a fresh verification code for the sign-up in progress and returns it.
-     * Until an SMS or e-mail channel exists, the caller shows it on screen labelled as a test code.
+     * No verification step. There was one, and it was theatre: the code was generated on the
+     * device, printed on the same screen that asked for it, and checked against itself. A step
+     * that cannot fail verifies nothing, and showing it invites the reader to assume an identity
+     * check exists when none does.
+     *
+     * Real verification belongs behind this interface, not in front of it — an implementation
+     * backed by a server sends the code out of band and checks it there. Re-adding it here means
+     * adding the parameter back at that point, deliberately, with something on the other end.
      */
-    fun requestVerificationCode(): String
+    suspend fun signUp(name: String, userId: String, password: String): AuthResult
 
     suspend fun signOut()
 

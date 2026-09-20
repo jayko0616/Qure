@@ -16,8 +16,10 @@ import java.security.SecureRandom
  * Holds one built-in account (admin / 0000, Pro, "관리자") for development, plus whatever the user
  * registers on this device. Passwords are salted and hashed even here: a prototype store has a way
  * of surviving into the first release, and plaintext in SharedPreferences is exactly the kind of
- * thing that does. The verification code is generated locally and handed back to the caller for
- * display, because there is no SMS or e-mail channel yet.
+ * thing that does.
+ *
+ * [SecureRandom] is still here for the per-account salt. It used to also mint verification codes;
+ * see the note on [AccountRepository.signUp] for why that step is gone.
  *
  * Replace the whole class, not parts of it, when a backend arrives; nothing outside the
  * [AccountRepository] interface knows this exists.
@@ -28,7 +30,6 @@ class LocalAccountStore(context: Context) : AccountRepository {
         .getSharedPreferences("qure.account", Context.MODE_PRIVATE)
 
     private val random = SecureRandom()
-    private var pendingCode: String? = null
 
     private val state = MutableStateFlow(readProfile())
     override val profile: StateFlow<UserProfile> = state.asStateFlow()
@@ -54,10 +55,10 @@ class LocalAccountStore(context: Context) : AccountRepository {
         return AuthResult.Success
     }
 
-    override suspend fun signUp(name: String, userId: String, password: String, code: String): AuthResult {
+    override suspend fun signUp(name: String, userId: String, password: String): AuthResult {
         val cleanName = name.trim()
         val id = userId.trim()
-        if (cleanName.isEmpty() || id.isEmpty() || password.isEmpty() || code.isBlank()) {
+        if (cleanName.isEmpty() || id.isEmpty() || password.isEmpty()) {
             return AuthResult.Failure(AuthError.emptyField)
         }
         val users = readUsers()
@@ -65,23 +66,14 @@ class LocalAccountStore(context: Context) : AccountRepository {
             return AuthResult.Failure(AuthError.duplicateId)
         }
         if (!PasswordPolicy.isValid(password)) return AuthResult.Failure(AuthError.weakPassword)
-        val expected = pendingCode ?: return AuthResult.Failure(AuthError.codeNotRequested)
-        if (code.trim() != expected) return AuthResult.Failure(AuthError.wrongCode)
 
         val salt = newSalt()
         val user = StoredUser(
             id = id, name = cleanName, salt = salt, hash = hash(password, salt), tier = PlanTier.free,
         )
         writeUsers(users + user)
-        pendingCode = null
         writeProfile(UserProfile(signedIn = true, userId = id, displayName = cleanName, tier = user.tier))
         return AuthResult.Success
-    }
-
-    override fun requestVerificationCode(): String {
-        val code = "%06d".format(random.nextInt(1_000_000))
-        pendingCode = code
-        return code
     }
 
     override suspend fun signOut() {

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -48,6 +47,7 @@ import com.qure.app.domain.ParsedPayload
 import com.qure.app.domain.UrlParser
 import com.qure.app.screen.ResultScreen
 import com.qure.app.ui.theme.QrYellow
+import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.QureTheme
 import com.qure.app.ui.theme.highlightHost
 import com.qure.app.ui.theme.middleEllipsis
@@ -166,7 +166,7 @@ private fun InspectFlow(
 private fun ConfirmCard(parsed: ParsedPayload, onYes: () -> Unit, onNo: () -> Unit) {
     val safeText = remember(parsed.raw) { middleEllipsis(UrlParser.toDisplayString(parsed.raw)) }
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = Radius.sheet,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
     ) {

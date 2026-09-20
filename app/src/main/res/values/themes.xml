@@ -26,4 +26,18 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- The launch window. Android 12+ draws the adaptive icon on a solid brand background instead
+         of the blank flash that used to stand between tapping the icon and the viewfinder.
+         Nothing new is drawn: it reuses @mipmap/ic_launcher and colours the app already ships.
+
+         Inherits Theme.Qure rather than restating it, so the activity keeps exactly the window
+         background and system-bar treatment it had before — the platform stops applying the splash
+         attributes once the first frame is drawn, and there is nothing else to hand back to. On API
+         30 and below the splash attributes are simply ignored and behaviour is unchanged. -->
+    <style name="Theme.Qure.Splash" parent="Theme.Qure">
+        <item name="android:windowSplashScreenBackground">@color/qure_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/qure_icon_background</item>
+    </style>
 </resources>

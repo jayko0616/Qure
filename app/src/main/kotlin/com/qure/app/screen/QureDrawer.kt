@@ -1,37 +1,54 @@
 package com.qure.app.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.qure.app.BuildConfig
 import com.qure.app.R
-import com.qure.app.account.PlanTier
 import com.qure.app.account.UserProfile
 import com.qure.app.ui.theme.QrYellow
+import com.qure.app.ui.theme.Radius
+import com.qure.app.ui.theme.Spacing
 
 /** The destinations reachable from the side menu. */
 enum class DrawerDestination { scanner, profile, myPage, cameraLink }
 
+/**
+ * The side menu.
+ *
+ * Two things changed here beyond spacing. Signed out, the sheet used to show nothing at all above
+ * the nav items — a blank header over a menu. It now offers a way in, because the only reason to
+ * sign in is the thing the header is the natural place to mention. And the stock-camera entry is
+ * separated from the three app destinations: it is a setting, not a place.
+ */
 @Composable
 fun QureDrawerSheet(
     profile: UserProfile,
@@ -39,63 +56,80 @@ fun QureDrawerSheet(
     onSelect: (DrawerDestination) -> Unit,
 ) {
     ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background) {
-        Column(Modifier.statusBarsPadding().padding(horizontal = 12.dp)) {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Qure",
-                style = MaterialTheme.typography.headlineSmall,
-                color = QrYellow,
-                modifier = Modifier.padding(start = 16.dp),
-            )
-            Text(
-                stringResource(R.string.menu_tagline),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp),
-            )
+        Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = Spacing.md)) {
+            Spacer(Modifier.height(Spacing.lg))
+            BrandMark(modifier = Modifier.padding(start = Spacing.lg))
 
-            // Who is signed in, right where the menu opens. Signed-out shows nothing extra: the
-            // profile item below is the way in, and an empty "not signed in" line would only nag.
-            if (profile.signedIn) {
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    Modifier.padding(start = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        profile.displayName ?: profile.userId.orEmpty(),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onBackground,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    TierChip(profile.tier)
-                }
-                profile.userId?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 2.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(Spacing.lg))
+            IdentityBlock(profile, onSelect)
+            Spacer(Modifier.height(Spacing.lg))
 
             Item(DrawerDestination.scanner, Icons.Outlined.QrCodeScanner, R.string.menu_scanner, current, onSelect)
             Item(DrawerDestination.profile, Icons.Outlined.Person, R.string.menu_profile, current, onSelect)
             Item(DrawerDestination.myPage, Icons.Outlined.CreditCard, R.string.menu_mypage, current, onSelect) {
-                // The plan is worth surfacing where the user already is, rather than only behind
-                // another tap.
+                TierChip(profile.tier)
+            }
+
+            Spacer(Modifier.height(Spacing.md))
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+            Spacer(Modifier.height(Spacing.md))
+
+            Item(DrawerDestination.cameraLink, Icons.Outlined.Link, R.string.menu_camera_link, current, onSelect)
+
+            Spacer(Modifier.weight(1f))
+            Text(
+                stringResource(R.string.menu_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.padding(start = Spacing.lg, bottom = Spacing.xl),
+            )
+        }
+    }
+}
+
+/**
+ * Who is signed in — or an invitation, when nobody is.
+ *
+ * Tapping either state goes to the same destination, so the block is one target rather than a card
+ * with a button inside it.
+ */
+@Composable
+private fun IdentityBlock(profile: UserProfile, onSelect: (DrawerDestination) -> Unit) {
+    Surface(
+        shape = Radius.card,
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.sm)
+            .clickable { onSelect(DrawerDestination.profile) },
+    ) {
+        Row(
+            Modifier.padding(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            InitialAvatar(profile.displayName, modifier = Modifier.size(40.dp))
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(
-                        if (profile.tier == PlanTier.pro) R.string.plan_pro else R.string.plan_free
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (profile.tier == PlanTier.pro) QrYellow
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    profile.displayName ?: stringResource(R.string.profile_signed_out),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    profile.userId ?: stringResource(R.string.menu_sign_in_cta),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (profile.signedIn) MaterialTheme.colorScheme.onSurfaceVariant
+                    else QrYellow,
                 )
             }
-            Item(DrawerDestination.cameraLink, Icons.Outlined.Link, R.string.menu_camera_link, current, onSelect)
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -103,7 +137,7 @@ fun QureDrawerSheet(
 @Composable
 private fun Item(
     destination: DrawerDestination,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     labelRes: Int,
     current: DrawerDestination,
     onSelect: (DrawerDestination) -> Unit,

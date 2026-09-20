@@ -24,6 +24,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +35,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Link
@@ -46,6 +46,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -92,7 +93,9 @@ import com.qure.app.domain.Verdict
 import com.qure.app.link.LinkHandoff
 import com.qure.app.link.defaultBrowserRequestIntent
 import com.qure.app.link.isDefaultBrowser
+import com.qure.app.ui.theme.Motion
 import com.qure.app.ui.theme.QrYellow
+import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskDanger
 import com.qure.app.ui.theme.RiskSafe
 import com.qure.app.ui.theme.highlightHost
@@ -382,104 +385,112 @@ fun ScannerScreen(
                 }
 
                 // The stock-camera path is one of the app's two halves, and an icon alone hid it
-                // too well. This states plainly that it is off — but it is dismissible and never
-                // blocks the scanner, so it stays an offer rather than the toll gate that used to
-                // sit in front of first launch.
+                // too well. It stays an offer rather than a toll gate — but as one compact strip
+                // rather than the three-row card that used to be the largest thing on the first
+                // screen anybody ever sees. The full explanation is one tap away behind the link
+                // icon above, which keeps its dot for as long as the link is off.
                 if (!linked && bannerVisible) {
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF15181D).copy(alpha = 0.92f),
-                        ),
+                    Surface(
+                        shape = Radius.card,
+                        color = Color(0xFF15181D).copy(alpha = 0.92f),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                     ) {
-                        // Text on its own row, actions beneath. Side by side, the Korean title wraps
-                        // to three lines and squeezes the button into an unreadable sliver.
-                        Column(Modifier.padding(start = 14.dp, top = 12.dp, end = 6.dp, bottom = 4.dp)) {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.Top,
+                        Row(
+                            Modifier.padding(start = 14.dp, end = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                stringResource(R.string.banner_title),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                            )
+                            TextButton(
+                                onClick = { roleLauncher.launch(context.defaultBrowserRequestIntent()) },
+                                contentPadding = PaddingValues(horizontal = 10.dp),
                             ) {
-                                Column(Modifier.weight(1f).padding(end = 4.dp)) {
-                                    Text(
-                                        stringResource(R.string.banner_title),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color.White,
-                                    )
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        stringResource(R.string.banner_body),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.6f),
-                                    )
-                                }
-                                IconButton(onClick = { bannerVisible = false }) {
-                                    Icon(
-                                        Icons.Outlined.Close,
-                                        contentDescription = stringResource(R.string.banner_dismiss),
-                                        tint = Color.White.copy(alpha = 0.5f),
-                                    )
-                                }
+                                Text(
+                                    stringResource(R.string.banner_cta),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = QrYellow,
+                                )
                             }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                TextButton(
-                                    onClick = { roleLauncher.launch(context.defaultBrowserRequestIntent()) },
-                                ) {
-                                    Text(stringResource(R.string.banner_cta), color = QrYellow)
-                                }
+                            IconButton(
+                                onClick = { bannerVisible = false },
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = stringResource(R.string.banner_dismiss),
+                                    tint = Color.White.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(18.dp),
+                                )
                             }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = stringResource(
-                        if (tracked == null) R.string.scanner_hint else R.string.scanner_hint_found
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White,
-                    // White-on-camera is unreadable the moment the lens finds something bright.
-                    modifier = Modifier
-                        .background(Color(0xFF0B0D10).copy(alpha = 0.55f), RoundedCornerShape(999.dp))
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                )
+                // The idle hint is gone: the primary button already reads "QR을 비춰주세요", and
+                // saying it twice on the same screen was the clearest sign nobody had looked at
+                // this view as a whole. The pill now only appears to CONFIRM a hit, which makes it
+                // a state change the eye catches rather than permanent furniture.
+                AnimatedVisibility(
+                    visible = tracked != null,
+                    enter = fadeIn() + slideInVertically { -it / 2 },
+                    exit = fadeOut(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.scanner_hint_found),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        // White-on-camera is unreadable the moment the lens finds something bright.
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .background(Color(0xFF0B0D10).copy(alpha = 0.6f), Radius.pill)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
 
                 // Blacklist actions live up here, away from the inspect button. Down at the bottom
                 // they sat beside the primary action and competed with it; the thumb reaches for
-                // one thing on this screen, and it should be "검사하기".
+                // one thing on this screen, and it should be "검사하기". "추가하기" now appears only
+                // when there is something to add, rather than sitting permanently greyed out.
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    Modifier.fillMaxWidth().padding(top = 2.dp),
                     horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onCreateBlacklist) {
                         Text(
                             stringResource(R.string.scanner_make_blacklist),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White.copy(alpha = 0.85f),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.7f),
                         )
                     }
-                    TextButton(
-                        onClick = {
-                            tracked?.rawValue?.let { onAddToBlacklist(it); justAdded = true }
-                        },
-                        enabled = tracked != null,
-                    ) {
-                        Text(
-                            stringResource(R.string.scanner_add_blacklist),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (tracked != null) QrYellow else Color.White.copy(alpha = 0.35f),
-                        )
+                    AnimatedVisibility(visible = tracked != null, enter = fadeIn(), exit = fadeOut()) {
+                        TextButton(
+                            onClick = {
+                                tracked?.rawValue?.let { onAddToBlacklist(it); justAdded = true }
+                            },
+                        ) {
+                            Text(
+                                stringResource(R.string.scanner_add_blacklist),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = QrYellow,
+                            )
+                        }
                     }
                 }
 
-                if (justAdded) {
+                AnimatedVisibility(visible = justAdded, enter = fadeIn(), exit = fadeOut()) {
                     Text(
                         stringResource(R.string.scanner_added_toast),
                         style = MaterialTheme.typography.labelMedium,
                         color = QrYellow,
                         modifier = Modifier
-                            .background(Color(0xFF0B0D10).copy(alpha = 0.7f), RoundedCornerShape(999.dp))
+                            .background(Color(0xFF0B0D10).copy(alpha = 0.7f), Radius.pill)
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
@@ -579,6 +590,7 @@ private fun PrimaryScanButton(tracked: QrDetection?, onInspect: (QrDetection) ->
     Button(
         onClick = { tracked?.let(onInspect) },
         enabled = tracked != null,
+        shape = Radius.card,
         colors = ButtonDefaults.buttonColors(
             containerColor = QrYellow,
             contentColor = Color(0xFF201A00),
@@ -607,8 +619,13 @@ private fun outlineColorFor(level: RiskLevel?): Color = when (level) {
 
 @Composable
 private fun QrOutline(detection: QrDetection, color: Color) {
-    val outline by animateColorAsState(color, tween(180), label = "outline")
+    val outline by animateColorAsState(color, tween(Motion.medium), label = "outline")
     Canvas(Modifier.fillMaxSize()) {
+        // Widths in dp, converted here. They used to be raw floats, which a Canvas reads as
+        // PIXELS — so the app's most distinctive element rendered at roughly 1.7dp on a 3x screen
+        // and all but disappeared on exactly the phones it was meant to impress.
+        val edgeWidth = 4.dp.toPx()
+        val bracketWidth = 9.dp.toPx()
         val corners = detection.cornersInViewPx
         // cornerPoints beat boundingBox: boundingBox is axis-aligned, so a code held at an angle
         // gets an outline visibly larger than the code itself.
@@ -625,7 +642,7 @@ private fun QrOutline(detection: QrDetection, color: Color) {
             close()
         }
         drawPath(path, outline.copy(alpha = 0.18f))
-        drawPath(path, outline, style = Stroke(width = 5f))
+        drawPath(path, outline, style = Stroke(width = edgeWidth))
 
         // Corner brackets read as "tracking" rather than "selected", and stay legible when the
         // quad is small or steeply angled.
@@ -636,11 +653,11 @@ private fun QrOutline(detection: QrDetection, color: Color) {
             val next = pts[(i + 1) % pts.size]
             drawLine(
                 outline, p, Offset(p.x + (next.x - p.x) * arm, p.y + (next.y - p.y) * arm),
-                strokeWidth = 12f, cap = StrokeCap.Round,
+                strokeWidth = bracketWidth, cap = StrokeCap.Round,
             )
             drawLine(
                 outline, p, Offset(p.x + (prev.x - p.x) * arm, p.y + (prev.y - p.y) * arm),
-                strokeWidth = 12f, cap = StrokeCap.Round,
+                strokeWidth = bracketWidth, cap = StrokeCap.Round,
             )
         }
     }
@@ -653,7 +670,7 @@ private fun InspectPrompt(detection: QrDetection, onYes: () -> Unit, onNo: () ->
         middleEllipsis(UrlParser.toDisplayString(detection.rawValue))
     }
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = Radius.sheet,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
     ) {

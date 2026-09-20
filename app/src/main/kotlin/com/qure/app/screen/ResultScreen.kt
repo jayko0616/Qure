@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
@@ -60,9 +59,12 @@ import com.qure.app.domain.Signal
 import com.qure.app.domain.UrlParser
 import com.qure.app.domain.Verdict
 import com.qure.app.signature.ScoreRubric
+import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskCaution
 import com.qure.app.ui.theme.RiskDanger
 import com.qure.app.ui.theme.RiskSafe
+import com.qure.app.ui.theme.Sizing
+import com.qure.app.ui.theme.Spacing
 import com.qure.app.ui.theme.highlightHost
 
 /**
@@ -218,7 +220,7 @@ private fun VerdictHeader(verdict: Verdict) {
 private fun ScoreBadge(score: Int?, color: Color) {
     Box(
         Modifier
-            .size(72.dp)
+            .size(Sizing.scoreBadge)
             .background(color.copy(alpha = 0.12f), CircleShape)
             .border(3.dp, color, CircleShape),
         contentAlignment = Alignment.Center,
@@ -245,10 +247,11 @@ private fun ScoreBadge(score: Int?, color: Color) {
 private fun FindingsCard(verdict: Verdict, parsed: ParsedPayload) {
     val assessed = verdict as? Verdict.Assessed
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = Radius.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(Spacing.lg)) {
             when {
                 assessed == null -> {
                     Label(stringResource(R.string.result_pending_title))
@@ -396,11 +399,14 @@ private fun Actions(
                     onClick = onBack,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) { Text(backLabel, style = MaterialTheme.typography.titleMedium) }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Spacing.xs))
                 TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.result_open_anyway),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // Muted red, not grey. It sat in exactly the same grey as "add to
+                        // blacklist" directly beneath it, so the one irreversible action on the
+                        // screen looked like the harmless one.
+                        color = RiskDanger.copy(alpha = 0.85f),
                     )
                 }
             }
@@ -443,10 +449,11 @@ private fun Actions(
 @Composable
 private fun PayloadCard(parsed: ParsedPayload) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = Radius.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(Spacing.lg)) {
             Label(stringResource(R.string.result_host))
             Text(
                 parsed.host ?: stringResource(R.string.result_no_host),
@@ -498,19 +505,19 @@ private fun kindLabelRes(kind: PayloadKind): Int = when (kind) {
 
 @Composable
 private fun EngineNotice() {
-    Text(
-        stringResource(R.string.result_engine_notice),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    // In a container like every other block of secondary copy in the app. Loose on the background
+    // it read as an afterthought appended to the verdict rather than part of it.
+    NoteCard(stringResource(R.string.result_engine_notice))
 }
 
 @Composable
 private fun Label(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 2.dp),
     )
 }
 
@@ -525,6 +532,7 @@ private fun ListPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = Radius.sheet,
         title = { Text(stringResource(R.string.result_pick_list)) },
         text = {
             Column {
@@ -556,6 +564,7 @@ private fun NameListDialog(onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
     var value by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = Radius.sheet,
         title = { Text(stringResource(R.string.blacklist_new_list)) },
         text = {
             OutlinedTextField(

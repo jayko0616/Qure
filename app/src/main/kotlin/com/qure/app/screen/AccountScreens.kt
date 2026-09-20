@@ -8,32 +8,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,17 +32,27 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.qure.app.R
 import com.qure.app.account.PlanTier
 import com.qure.app.account.UserProfile
 import com.qure.app.ui.theme.QrYellow
+import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskSafe
+import com.qure.app.ui.theme.Spacing
 
-/** 회원 프로필 — who is signed in, and how to change that. */
+/**
+ * 회원 프로필 — who is signed in, and how to change that.
+ *
+ * The signed-out state is the one that needed the work. It used to be a grey "?" circle beside two
+ * lines of text, pinned to the top of an otherwise empty screen. Centring the identity block and
+ * giving the explanation a container turns a page that looked unfinished into one that looks like
+ * it is telling you something deliberate: you do not need an account to use this app.
+ */
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
@@ -61,61 +61,64 @@ fun ProfileScreen(
     onSignOut: () -> Unit,
     onBack: () -> Unit,
 ) {
-    AccountScaffold(title = stringResource(R.string.menu_profile), onBack = onBack) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(56.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    profile.displayName?.take(1) ?: "?",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+    QureScaffold(
+        title = stringResource(R.string.menu_profile),
+        onBack = onBack,
+        bottomBar = {
+            ActionStack {
+                if (profile.signedIn) {
+                    SecondaryButton(
+                        text = stringResource(R.string.profile_sign_out),
+                        onClick = onSignOut,
+                    )
+                } else {
+                    PrimaryButton(
+                        text = stringResource(R.string.profile_sign_in),
+                        onClick = onGoLogin,
+                    )
+                    SecondaryButton(
+                        text = stringResource(R.string.profile_sign_up),
+                        onClick = onGoSignUp,
+                    )
+                }
             }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
+        },
+    ) {
+        Spacer(Modifier.height(Spacing.xl))
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            InitialAvatar(profile.displayName)
+            Spacer(Modifier.height(Spacing.md))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     profile.displayName ?: stringResource(R.string.profile_signed_out),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
-                Spacer(Modifier.height(2.dp))
-                val id = profile.userId
-                Text(
-                    if (profile.signedIn && id != null) stringResource(R.string.profile_user_id, id)
-                    else stringResource(R.string.profile_anonymous_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (profile.signedIn) {
+                    Spacer(Modifier.width(Spacing.sm))
+                    TierChip(profile.tier)
+                }
             }
-            if (profile.signedIn) {
-                Spacer(Modifier.width(8.dp))
-                TierChip(profile.tier)
-            }
+            Spacer(Modifier.height(Spacing.xs))
+            val id = profile.userId
+            Text(
+                if (profile.signedIn && id != null) stringResource(R.string.profile_user_id, id)
+                else stringResource(R.string.profile_anonymous_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
 
-        Spacer(Modifier.height(20.dp))
-        InfoCard(stringResource(R.string.profile_why))
+        Spacer(Modifier.height(Spacing.xxl))
+        NoteCard(stringResource(R.string.profile_why))
 
-        Spacer(Modifier.height(20.dp))
-        if (profile.signedIn) {
-            OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth().height(50.dp)) {
-                Text(stringResource(R.string.profile_sign_out))
-            }
-        } else {
-            Button(
-                onClick = onGoLogin,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = QrYellow, contentColor = Color(0xFF201A00),
-                ),
-            ) { Text(stringResource(R.string.profile_sign_in)) }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onGoSignUp, modifier = Modifier.fillMaxWidth().height(50.dp)) {
-                Text(stringResource(R.string.profile_sign_up))
-            }
-            Spacer(Modifier.height(8.dp))
+        if (!profile.signedIn) {
+            Spacer(Modifier.height(Spacing.md))
             Text(
                 stringResource(R.string.profile_sign_in_note),
                 style = MaterialTheme.typography.labelSmall,
@@ -125,28 +128,12 @@ fun ProfileScreen(
     }
 }
 
-/** The plan, as a small pill. Yellow is reserved for Pro so the free state never looks "on". */
-@Composable
-internal fun TierChip(tier: PlanTier) {
-    val pro = tier == PlanTier.pro
-    Text(
-        stringResource(if (pro) R.string.plan_pro else R.string.plan_free),
-        style = MaterialTheme.typography.labelMedium,
-        color = if (pro) Color(0xFF201A00) else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .background(
-                if (pro) QrYellow else MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(999.dp),
-            )
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    )
-}
-
 /**
  * 마이페이지 — a short menu rather than one long page.
  *
- * The plan is collapsed by default: it is a thing you set once and then rarely think about, so it
- * should not be the wall of text standing between the user and the list they came here to edit.
+ * The plan stays collapsed by default: it is a thing you set once and then rarely think about, so
+ * it should not be the wall of text standing between the user and the list they came here to edit.
+ * The summary row at the top is new — the screen previously gave no indication of whose page it was.
  */
 @Composable
 fun MyPageScreen(
@@ -158,8 +145,12 @@ fun MyPageScreen(
 ) {
     var planExpanded by rememberSaveable { mutableStateOf(false) }
 
-    AccountScaffold(title = stringResource(R.string.menu_mypage), onBack = onBack) {
+    QureScaffold(title = stringResource(R.string.menu_mypage), onBack = onBack) {
+        AccountSummary(profile)
+
+        Spacer(Modifier.height(Spacing.xl))
         MenuRow(
+            icon = Icons.Outlined.CreditCard,
             title = stringResource(R.string.mypage_plan),
             trailing = stringResource(
                 if (profile.tier == PlanTier.pro) R.string.plan_pro else R.string.plan_free
@@ -170,7 +161,7 @@ fun MyPageScreen(
         )
 
         AnimatedVisibility(visible = planExpanded) {
-            Column(Modifier.padding(top = 12.dp)) {
+            Column(Modifier.padding(top = Spacing.md)) {
                 PlanCard(
                     title = stringResource(R.string.plan_free),
                     selected = profile.tier == PlanTier.free,
@@ -181,7 +172,7 @@ fun MyPageScreen(
                         stringResource(R.string.feat_inert_display) to true,
                     ),
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(Spacing.md))
                 PlanCard(
                     title = stringResource(R.string.plan_pro),
                     selected = profile.tier == PlanTier.pro,
@@ -193,24 +184,69 @@ fun MyPageScreen(
                         stringResource(R.string.feat_live_signatures) to false,
                     ),
                 )
-                Spacer(Modifier.height(10.dp))
-                InfoCard(stringResource(R.string.mypage_not_available))
+                Spacer(Modifier.height(Spacing.md))
+                NoteCard(stringResource(R.string.mypage_not_available))
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(Spacing.md))
         MenuRow(
+            icon = Icons.Outlined.Block,
             title = stringResource(R.string.mypage_my_lists),
             trailing = stringResource(R.string.mypage_list_count, listCount),
             onClick = onOpenLists,
         )
-        Spacer(Modifier.height(8.dp))
-        InfoCard(stringResource(R.string.mypage_lists_note))
+        Spacer(Modifier.height(Spacing.md))
+        NoteCard(stringResource(R.string.mypage_lists_note))
+    }
+}
+
+// ── pieces ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Who this page belongs to. Compact on purpose — it orients, it is not the content. */
+@Composable
+private fun AccountSummary(profile: UserProfile) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .background(
+                    if (profile.signedIn) QrYellow.copy(alpha = 0.16f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                    CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                profile.displayName?.take(1) ?: "?",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (profile.signedIn) QrYellow
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(
+                profile.displayName ?: stringResource(R.string.profile_signed_out),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            profile.userId?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        TierChip(profile.tier)
     }
 }
 
 @Composable
 private fun MenuRow(
+    icon: ImageVector,
     title: String,
     trailing: String,
     onClick: () -> Unit,
@@ -219,28 +255,37 @@ private fun MenuRow(
 ) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = Radius.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            Modifier.padding(horizontal = 18.dp, vertical = 18.dp).fillMaxWidth(),
+            Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.lg).fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(Spacing.md))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     trailing,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = if (trailingHighlighted) QrYellow
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(Spacing.xs))
                 Icon(
                     imageVector = when (expanded) {
                         true -> Icons.Outlined.KeyboardArrowUp
@@ -249,45 +294,8 @@ private fun MenuRow(
                     },
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
-            }
-        }
-    }
-}
-
-// ── shared bits ────────────────────────────────────────────────────────────────────────────────
-
-@Composable
-internal fun AccountScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        // Both insets are consumed OUTSIDE the scroll container. Applied inside, the scroll
-        // viewport still extends under the navigation bar and the last control on the page ends up
-        // sitting beneath the system buttons.
-        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = stringResource(R.string.nav_back),
-                        tint = MaterialTheme.colorScheme.onBackground,
-                    )
-                }
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp),
-            ) {
-                Spacer(Modifier.height(12.dp))
-                content()
-                Spacer(Modifier.height(32.dp))
             }
         }
     }
@@ -310,12 +318,12 @@ private fun PlanCard(
 ) {
     Card(
         onClick = onSelect,
-        shape = RoundedCornerShape(16.dp),
+        shape = Radius.card,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = if (selected) BorderStroke(2.dp, QrYellow) else null,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.padding(Spacing.lg)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -328,24 +336,22 @@ private fun PlanCard(
                     color = if (selected) QrYellow else MaterialTheme.colorScheme.onSurface,
                 )
                 if (selected) {
-                    Text(
-                        stringResource(R.string.mypage_current_plan),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = QrYellow,
-                    )
+                    CountBadge(stringResource(R.string.mypage_current_plan), accent = true)
                 }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(Spacing.md))
             lines.forEach { (text, available) ->
-                Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
+                Row(
+                    Modifier.padding(vertical = Spacing.xs),
+                    verticalAlignment = Alignment.Top,
+                ) {
                     Box(
-                        Modifier.padding(top = 6.dp).size(7.dp)
-                            .background(
-                                if (available) RiskSafe else MaterialTheme.colorScheme.onSurfaceVariant,
-                                CircleShape,
-                            ),
+                        Modifier.padding(top = 6.dp).size(7.dp).background(
+                            if (available) RiskSafe else MaterialTheme.colorScheme.onSurfaceVariant,
+                            CircleShape,
+                        ),
                     )
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(Spacing.md))
                     Column {
                         Text(
                             text,
@@ -366,13 +372,4 @@ private fun PlanCard(
             }
         }
     }
-}
-
-@Composable
-private fun InfoCard(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
