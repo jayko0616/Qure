@@ -40,11 +40,14 @@ import com.qure.app.BuildConfig
 import com.qure.app.R
 import com.qure.app.signature.SignatureEngine
 import androidx.compose.ui.platform.LocalContext
+import com.qure.app.account.LocalAccountStore
+import com.qure.app.blacklist.BlacklistQuota
 import com.qure.app.blacklist.LocalBlacklistStore
 import com.qure.app.blacklist.UserBlacklistSignature
 import com.qure.app.signature.Signatures
 import com.qure.app.domain.ParsedPayload
 import com.qure.app.domain.UrlParser
+import com.qure.app.screen.QuotaDialog
 import com.qure.app.screen.ResultScreen
 import com.qure.app.ui.theme.QrYellow
 import com.qure.app.ui.theme.Radius
@@ -126,6 +129,18 @@ private fun InspectFlow(
     // the user would have to remember the address and go find the app.
     val store = remember(context) { LocalBlacklistStore(context) }
     val blacklists by store.lists.collectAsStateWithLifecycle()
+    // The signed-out entry cap has to hold here too. Enforced only in MainActivity it would be
+    // bypassable by adding through the stock-camera path instead, which is the same feature.
+    val account = remember(context) { LocalAccountStore(context) }
+    val profile by account.profile.collectAsStateWithLifecycle()
+    var quotaBlocked by remember { mutableStateOf(false) }
+
+    fun refusedByQuota(listId: String?, value: String): Boolean {
+        val targetEntries = blacklists.firstOrNull { it.id == listId }?.entries.orEmpty()
+        val refused = BlacklistQuota.wouldExceed(profile.signedIn, blacklists, targetEntries, value)
+        if (refused) quotaBlocked = true
+        return refused
+    }
     val analyzer = remember(store) {
         SignatureEngine(Signatures.rules + UserBlacklistSignature { store.allEntries() })
     }
@@ -153,12 +168,23 @@ private fun InspectFlow(
                 onOpen = onOpenDirectly,
                 backLabel = stringResource(R.string.result_close),
                 blacklists = blacklists,
-                onAddToList = { id, v -> scope.launch { store.addEntry(id, v) } },
+                onAddToList = { id, v ->
+                    if (!refusedByQuota(id, v)) scope.launch { store.addEntry(id, v) }
+                },
                 onCreateListAndAdd = { name, v ->
-                    scope.launch { store.addEntry(store.createList(name), v) }
+                    if (!refusedByQuota(null, v)) {
+                        scope.launch { store.addEntry(store.createList(name), v) }
+                    }
                 },
             )
         }
+    }
+
+    if (quotaBlocked) {
+        QuotaDialog(
+            limit = BlacklistQuota.anonymousEntryLimit,
+            onDismiss = { quotaBlocked = false },
+        )
     }
 }
 

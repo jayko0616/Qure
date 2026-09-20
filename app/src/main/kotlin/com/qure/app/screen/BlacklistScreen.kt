@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.qure.app.R
 import com.qure.app.blacklist.Blacklist
+import com.qure.app.blacklist.BlacklistQuota
 import com.qure.app.ui.theme.QrYellow
 import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskDanger
@@ -67,6 +68,8 @@ private sealed interface Editing {
 @Composable
 fun BlacklistScreen(
     lists: List<Blacklist>,
+    /** Entries a signed-out user may hold in total. Null when there is no cap. */
+    quotaLimit: Int?,
     onCreateList: (String) -> Unit,
     onRenameList: (String, String) -> Unit,
     onDeleteList: (String) -> Unit,
@@ -108,6 +111,19 @@ fun BlacklistScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            quotaLimit?.let { limit ->
+                val used = BlacklistQuota.entriesUsed(lists)
+                Spacer(Modifier.height(Spacing.sm))
+                Text(
+                    stringResource(
+                        if (used >= limit) R.string.quota_full else R.string.quota_remaining,
+                        limit, used,
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (used >= limit) QrYellow
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.height(Spacing.lg))
 
             lists.forEach { list ->

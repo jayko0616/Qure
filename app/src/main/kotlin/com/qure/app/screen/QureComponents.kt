@@ -26,8 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -411,6 +414,68 @@ fun PasswordField(
             keyboardType = KeyboardType.Password, imeAction = imeAction,
         ),
         keyboardActions = keyboardActions,
+    )
+}
+
+/**
+ * What a signed-out user sees when they run out of saved entries.
+ *
+ * Deliberately a dialog they can dismiss, not a wall. Whatever they were doing is still there
+ * underneath, every entry they already saved still works, and the scan that prompted this was
+ * already answered in full — the cap is on storage, never on the verdict.
+ *
+ * [onSignUp] is null where there is nowhere to send them, which is the case on the stock-camera
+ * overlay: it is a transient window over somebody else's app and pulling them into a sign-up form
+ * from there would be a worse intrusion than the limit it is explaining.
+ */
+@Composable
+fun QuotaDialog(
+    limit: Int,
+    onDismiss: () -> Unit,
+    onSignUp: (() -> Unit)? = null,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = Radius.sheet,
+        icon = {
+            Icon(
+                Icons.Outlined.Lock,
+                contentDescription = null,
+                tint = QrYellow,
+                modifier = Modifier.size(24.dp),
+            )
+        },
+        title = { Text(stringResource(R.string.quota_title, limit)) },
+        text = {
+            Text(
+                stringResource(
+                    if (onSignUp == null) R.string.quota_in_app else R.string.quota_body
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        confirmButton = {
+            if (onSignUp == null) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.quota_ok), color = QrYellow)
+                }
+            } else {
+                TextButton(onClick = onSignUp) {
+                    Text(stringResource(R.string.quota_signup), color = QrYellow)
+                }
+            }
+        },
+        dismissButton = if (onSignUp == null) null else {
+            {
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        stringResource(R.string.quota_later),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
     )
 }
 

@@ -20,6 +20,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.qure.app.account.LocalAccountStore
 import com.qure.app.account.PlanTier
+import com.qure.app.blacklist.BlacklistQuota
 import com.qure.app.blacklist.LocalBlacklistStore
 import com.qure.app.blacklist.UserBlacklistSignature
 import com.qure.app.camera.CameraPermissionGate
@@ -31,6 +32,7 @@ import com.qure.app.screen.DrawerDestination
 import com.qure.app.screen.LoginScreen
 import com.qure.app.screen.MyPageScreen
 import com.qure.app.screen.ProfileScreen
+import com.qure.app.screen.QuotaDialog
 import com.qure.app.screen.QureDrawerSheet
 import com.qure.app.screen.ResultScreen
 import com.qure.app.screen.ScannerScreen
@@ -95,11 +97,26 @@ private fun QureApp() {
         SignatureEngine(Signatures.rules + UserBlacklistSignature { blacklistStore.allEntries() })
     }
 
+    // Signed-out users get a capped number of saved entries. Every path that can add one goes
+    // through [refusedByQuota] rather than each screen deciding for itself, so the rule cannot
+    // apply on one route and quietly not on another.
+    var quotaBlocked by remember { mutableStateOf(false) }
+
+    /** @return true when this add was refused, in which case the caller must not write. */
+    fun refusedByQuota(listId: String?, value: String): Boolean {
+        val targetEntries = blacklists.firstOrNull { it.id == listId }?.entries.orEmpty()
+        val refused = BlacklistQuota.wouldExceed(profile.signedIn, blacklists, targetEntries, value)
+        if (refused) quotaBlocked = true
+        return refused
+    }
+
     fun addToBlacklist(value: String) {
+        val targetId = blacklists.firstOrNull()?.id
+        if (refusedByQuota(targetId, value)) return
         scope.launch {
             // Land somewhere sensible rather than refusing: if the user has never made a list, the
             // act of adding to one is a clear enough signal that they want one.
-            val target = blacklists.firstOrNull()?.id ?: blacklistStore.createList(defaultListName)
+            val target = targetId ?: blacklistStore.createList(defaultListName)
             blacklistStore.addEntry(target, value)
         }
     }
@@ -156,9 +173,17 @@ private fun QureApp() {
                         route = Route.Scanner
                     },
                     blacklists = blacklists,
-                    onAddToList = { id, v -> scope.launch { blacklistStore.addEntry(id, v) } },
+                    onAddToList = { id, v ->
+                        if (!refusedByQuota(id, v)) {
+                            scope.launch { blacklistStore.addEntry(id, v) }
+                        }
+                    },
                     onCreateListAndAdd = { name, v ->
-                        scope.launch { blacklistStore.addEntry(blacklistStore.createList(name), v) }
+                        // A list that does not exist yet holds nothing, so there is no duplicate
+                        // to forgive — null target, empty entries.
+                        if (!refusedByQuota(null, v)) {
+                            scope.launch { blacklistStore.addEntry(blacklistStore.createList(name), v) }
+                        }
                     },
                 )
             }
@@ -202,10 +227,17 @@ private fun QureApp() {
                 BackHandler { route = Route.MyPage }
                 BlacklistScreen(
                     lists = blacklists,
+                    // Null means unlimited. Shown on the screen so the cap is visible before it is
+                    // hit, rather than arriving as a refusal.
+                    quotaLimit = BlacklistQuota.entryLimit(profile.signedIn),
                     onCreateList = { name -> scope.launch { blacklistStore.createList(name) } },
                     onRenameList = { id, name -> scope.launch { blacklistStore.renameList(id, name) } },
                     onDeleteList = { id -> scope.launch { blacklistStore.deleteList(id) } },
-                    onAddEntry = { id, v -> scope.launch { blacklistStore.addEntry(id, v) } },
+                    onAddEntry = { id, v ->
+                        if (!refusedByQuota(id, v)) {
+                            scope.launch { blacklistStore.addEntry(id, v) }
+                        }
+                    },
                     onUpdateEntry = { id, i, v -> scope.launch { blacklistStore.updateEntry(id, i, v) } },
                     onRemoveEntry = { id, i -> scope.launch { blacklistStore.removeEntry(id, i) } },
                     onBack = { route = Route.MyPage },
@@ -223,5 +255,17 @@ private fun QureApp() {
                 )
             }
         }
+    }
+
+    if (quotaBlocked) {
+        QuotaDialog(
+            limit = BlacklistQuota.anonymousEntryLimit,
+            onSignUp = {
+                quotaBlocked = false
+                route = Route.SignUp
+                scope.launch { drawerState.close() }
+            },
+            onDismiss = { quotaBlocked = false },
+        )
     }
 }
