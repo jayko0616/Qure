@@ -5,42 +5,19 @@ import android.graphics.RectF
 import android.util.Log
 import android.util.Size
 import androidx.annotation.MainThread
-import androidx.annotation.OptIn as AndroidXOptIn   // androidx.annotation.OptIn shadows kotlin.OptIn
-import androidx.camera.core.ExperimentalGetImage    // androidx.camera.core, NOT androidx.annotation
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect as ComposeRect
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.qure.app.BuildConfig
 import com.qure.app.domain.QrDetection
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
+import androidx.annotation.OptIn as AndroidXOptIn
+import androidx.compose.ui.geometry.Rect as ComposeRect
 
-/**
- * Turns camera frames into [QrDetection]s whose geometry is ALREADY in PreviewView pixels.
- *
- * How the coordinates work, because this is the part every tutorial gets wrong:
- *  1. [getTargetCoordinateSystem] returns COORDINATE_SYSTEM_VIEW_REFERENCED. A CameraController
- *     attached to a PreviewView then calls [updateTransform] with the SENSOR -> PreviewView matrix.
- *     That matrix already bakes in preview resolution, view size, ScaleType (FILL_CENTER crops!),
- *     display rotation and mirroring — all the things hand-rolled math gets subtly wrong.
- *     This only happens with a CameraController; under a bare ProcessCameraProvider,
- *     updateTransform is called with null forever.
- *  2. ML Kit reports in the rotation-applied ANALYSIS buffer space, not sensor space. So we build
- *     analysis -> sensor from sensorToBufferTransformMatrix composed with ML Kit's rotation,
- *     invert it, then postConcat sensor -> view.
- *  3. That matrix goes to process(image, rotation, matrix); ML Kit applies it internally, so
- *     cornerPoints come back in PreviewView pixels and the UI does no math at all.
- *
- * Analysis is continuous and never pauses: the caller decides what to do with the results, and
- * the outline it draws has to keep up with the code as the phone moves.
- *
- * The other half of this class is close() discipline. Under STRATEGY_KEEP_ONLY_LATEST a single
- * missed [ImageProxy.close] stalls the pipeline permanently — the preview simply freezes with no
- * error anywhere. Every path below closes exactly once.
- */
 class QrScanAnalyzer(
     private val scanner: BarcodeScanner,
     private val callbackExecutor: Executor,
@@ -53,16 +30,10 @@ class QrScanAnalyzer(
 
     @MainThread
     override fun updateTransform(matrix: Matrix?) {
-        // Called on the main thread; analyze() runs on the analysis thread. Copy defensively.
-        // Null is normal for the first few frames before the PreviewView is laid out.
+
         sensorToView = matrix?.let { Matrix(it) }
     }
 
-    /**
-     * Only consulted when the caller sets no ResolutionSelector, but kept in agreement with the
-     * one ScannerScreen does set so the two can never silently disagree. 4:3 on purpose — see the
-     * note there about 16:9 cropping the horizontal field in portrait.
-     */
     override fun getDefaultTargetResolution(): Size = Size(1920, 1440)
 
     @AndroidXOptIn(ExperimentalGetImage::class)
@@ -75,8 +46,7 @@ class QrScanAnalyzer(
         val timestamp = imageProxy.imageInfo.timestamp
 
         if (BuildConfig.DEBUG && logged.compareAndSet(false, true)) {
-            // One line, once: the actual buffer the analyzer receives. Frame geometry is the first
-            // thing to check when codes near the edges stop being seen.
+
             Log.i(logTag, "analysis buffer ${imageProxy.width}x${imageProxy.height} rot=$rotationDegrees")
         }
 
@@ -86,18 +56,16 @@ class QrScanAnalyzer(
                     onResult(barcodes.mapNotNull { it.toDetection(timestamp) })
                 }
                 .addOnFailureListener(callbackExecutor) { onResult(emptyList()) }
-                // The single authoritative close: fires on success, failure AND cancellation.
-                // Closing earlier corrupts the read — ML Kit reads the Image asynchronously.
+
                 .addOnCompleteListener { imageProxy.close() }
         } catch (t: Throwable) {
-            // process() throws synchronously if the scanner has already been closed.
+
             imageProxy.close()
         }
     }
 
     private fun Barcode.toDetection(timestamp: Long): QrDetection? {
-        // rawValue, not displayValue: displayValue is sanitised for presentation, and a security
-        // tool must reason about the bytes the code actually carries.
+
         val value = rawValue ?: return null
         val box = boundingBox ?: return null
         return QrDetection(

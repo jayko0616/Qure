@@ -7,15 +7,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-/** The highlight colour. Chosen to read as "the system noticed something", not "danger". */
 val QrYellow = Color(0xFFFFC800)
 
 val RiskSafe = Color(0xFF35C759)
 val RiskCaution = Color(0xFFFFB020)
 val RiskDanger = Color(0xFFFF453A)
 
-// A scanner is a viewfinder: it is dark by default and stays dark in light mode too, because a
-// white surface behind a camera preview is glare in the user's face.
 private val QureDark = darkColorScheme(
     primary = QrYellow,
     onPrimary = Color(0xFF201A00),
@@ -36,10 +33,6 @@ private val QureLight = lightColorScheme(
     error = RiskDanger,
 )
 
-/**
- * @param forceDark the scanner screen passes true: it sits on top of a camera preview, where the
- * system light theme would be actively unpleasant.
- */
 @Composable
 fun QureTheme(forceDark: Boolean = false, content: @Composable () -> Unit) {
     MaterialTheme(

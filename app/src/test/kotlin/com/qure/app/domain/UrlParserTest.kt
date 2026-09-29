@@ -5,10 +5,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * These are the cases android.net.Uri gets wrong or normalises away. If any regress, the whole
- * signature layer starts reasoning about a different URL than the one the phone would open.
- */
 class UrlParserTest {
 
     private fun host(s: String) = UrlParser.parse(s).host
@@ -68,8 +64,7 @@ class UrlParserTest {
     }
 
     @Test fun `structural facts carry no judgement`() {
-        // A clean URL must produce a payload with every risk flag false — the parser is not allowed
-        // to have an opinion, only to report shape.
+
         val p = UrlParser.parse("https://www.naver.com/")
         assertFalse(p.isIpHost)
         assertFalse(p.hasPunycode)

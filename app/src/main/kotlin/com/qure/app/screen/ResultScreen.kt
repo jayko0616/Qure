@@ -1,26 +1,13 @@
 package com.qure.app.screen
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,6 +15,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,11 +23,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,7 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.qure.app.R
 import com.qure.app.blacklist.Blacklist
 import com.qure.app.domain.ParsedPayload
@@ -57,6 +42,7 @@ import com.qure.app.domain.RiskLevel
 import com.qure.app.domain.Severity
 import com.qure.app.domain.Signal
 import com.qure.app.domain.UrlParser
+import com.qure.app.domain.Stage
 import com.qure.app.domain.Verdict
 import com.qure.app.signature.ScoreRubric
 import com.qure.app.ui.theme.Radius
@@ -65,25 +51,32 @@ import com.qure.app.ui.theme.RiskDanger
 import com.qure.app.ui.theme.RiskSafe
 import com.qure.app.ui.theme.Sizing
 import com.qure.app.ui.theme.Spacing
-import com.qure.app.ui.theme.highlightHost
+import com.qure.app.ui.component.NoteCard
+import com.qure.app.ui.text.highlightHost
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 
-/**
- * The verdict.
- *
- * Everything on this screen is inert text. Nothing here is tappable through to the payload, by
- * design: an anti-phishing app that offers a one-tap "open it anyway" on the same screen as the
- * warning has just built a better phishing funnel than the attacker had.
- *
- * What the screen shows about the score: the total, and nothing else. Findings are sentences,
- * ordered by severity. The order reveals rank, which cannot be hidden and does not need to be; it
- * never reveals distance, so the order alone cannot be used to find the edge of green.
- */
 @Composable
 fun ResultScreen(
     parsed: ParsedPayload,
     riskAnalyzer: QrRiskAnalyzer,
     onBack: () -> Unit,
-    /** Null when the payload is not something a browser can open (Wi-Fi credentials, plain text…). */
+
+    deepAnalyzer: QrRiskAnalyzer? = null,
+
     onOpen: (() -> Unit)? = null,
     backLabel: String = stringResource(R.string.result_back),
     blacklists: List<Blacklist> = emptyList(),
@@ -94,11 +87,18 @@ fun ResultScreen(
     var picking by remember { mutableStateOf(false) }
     var namingList by remember { mutableStateOf(false) }
     var addedTo by remember { mutableStateOf<String?>(null) }
-    // Failure is caught here and mapped to Verdict.Failed, never to a default-safe value.
-    val verdict by produceState<Verdict>(initialValue = Verdict.NotAssessed, parsed) {
-        value = runCatching { riskAnalyzer.analyze(parsed) }
+
+    val verdict by produceState<Verdict>(initialValue = Verdict.NotAssessed, parsed, deepAnalyzer) {
+        val shallow = runCatching { riskAnalyzer.analyze(parsed) }
             .getOrElse { Verdict.Failed(it.message ?: it::class.simpleName.orEmpty()) }
+        value = shallow
+
+        val deep = deepAnalyzer ?: return@produceState
+        if (!parsed.isWebLink) return@produceState
+        runCatching { deep.analyze(parsed) }.onSuccess { value = it }
     }
+    val deepening = deepAnalyzer != null && parsed.isWebLink &&
+        (verdict as? Verdict.Assessed)?.stage == Stage.s1
 
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -106,7 +106,7 @@ fun ResultScreen(
                 .padding(horizontal = 20.dp),
         ) {
             Spacer(Modifier.height(20.dp))
-            VerdictHeader(verdict)
+            VerdictHeader(verdict, deepening)
             Spacer(Modifier.height(24.dp))
             PayloadCard(parsed)
             Spacer(Modifier.height(16.dp))
@@ -122,8 +122,7 @@ fun ResultScreen(
                 onOpen = onOpen ?: {},
                 onBack = onBack,
                 onAddToBlacklist = {
-                    // No lists yet? Go straight to naming one. Showing an empty picker first would
-                    // be a dead end wearing the costume of a choice.
+
                     if (blacklists.isEmpty()) namingList = true else picking = true
                 },
             )
@@ -155,8 +154,6 @@ fun ResultScreen(
     }
 }
 
-// ── header ─────────────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun verdictColor(verdict: Verdict): Color = when (verdict) {
     is Verdict.Assessed -> when (verdict.level) {
@@ -164,14 +161,13 @@ private fun verdictColor(verdict: Verdict): Color = when (verdict) {
         RiskLevel.caution -> RiskCaution
         RiskLevel.dangerous -> RiskDanger
     }
-    // Failed and not-yet-run are exactly as unresolved as caution, and borrow its colour. Neither
-    // is ever allowed to borrow green.
+
     is Verdict.Failed -> RiskCaution
     Verdict.NotAssessed -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable
-private fun VerdictHeader(verdict: Verdict) {
+private fun VerdictHeader(verdict: Verdict, deepening: Boolean = false) {
     val color = verdictColor(verdict)
     val title = when (verdict) {
         is Verdict.Assessed -> stringResource(
@@ -186,7 +182,7 @@ private fun VerdictHeader(verdict: Verdict) {
     }
     val subtitle = when (verdict) {
         is Verdict.Assessed -> when {
-            // A clean run that lost rules says so in the headline, not in a footnote.
+
             verdict.level == RiskLevel.safe && verdict.failedSignatures.isNotEmpty() -> verdict.headline
             verdict.level == RiskLevel.safe -> stringResource(R.string.verdict_sub_safe)
             verdict.level == RiskLevel.caution -> stringResource(R.string.verdict_sub_caution)
@@ -211,11 +207,27 @@ private fun VerdictHeader(verdict: Verdict) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            if (deepening) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(12.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.verdict_deepening),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
 
-/** The one number the screen shows. Null while the analysis has not run yet. */
 @Composable
 private fun ScoreBadge(score: Int?, color: Color) {
     Box(
@@ -234,15 +246,6 @@ private fun ScoreBadge(score: Int?, color: Color) {
     }
 }
 
-// ── findings ───────────────────────────────────────────────────────────────────────────────────
-
-/**
- * Green lists what was checked; yellow and red list what was found.
- *
- * A green card with nothing on it looks like a check that never happened, so the rules that ran
- * clean are shown as ticks. Yellow and red show each signal as a title with one line of specifics
- * beneath it, worst first.
- */
 @Composable
 private fun FindingsCard(verdict: Verdict, parsed: ParsedPayload) {
     val assessed = verdict as? Verdict.Assessed
@@ -293,8 +296,6 @@ private fun FindingsCard(verdict: Verdict, parsed: ParsedPayload) {
                 }
             }
 
-            // A run that lost rules is not a clean run. Saying so on the card keeps the omission
-            // visible next to the findings rather than buried in a log.
             if (!assessed?.failedSignatures.isNullOrEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -349,20 +350,6 @@ private fun SignalRow(signal: Signal) {
     }
 }
 
-// ── actions ────────────────────────────────────────────────────────────────────────────────────
-
-/**
- * The one place the user acts.
- *
- * Opening the link has to be possible — an inspection the user cannot act on is a dead end, and a
- * tool that strands people trains them to stop using it. But the two choices are not weighted
- * equally at every risk level. On a dangerous verdict the primary, thumb-sized button is the one
- * that takes you back, and opening anyway is a plain text button that names what it is. That is a
- * deliberate asymmetry, not a hidden control: both actions are always visible and always one tap.
- *
- * A failed or not-yet-run analysis is treated exactly like caution. It is emphatically not treated
- * like safe, because nothing has actually cleared the link.
- */
 @Composable
 private fun Actions(
     verdict: Verdict,
@@ -403,16 +390,12 @@ private fun Actions(
                 TextButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.result_open_anyway),
-                        // Muted red, not grey. It sat in exactly the same grey as "add to
-                        // blacklist" directly beneath it, so the one irreversible action on the
-                        // screen looked like the harmless one.
+
                         color = RiskDanger.copy(alpha = 0.85f),
                     )
                 }
             }
 
-            // caution, analysis failed, or still running — same treatment: openable, but the label
-            // says the user is the one deciding.
             else -> {
                 OutlinedButton(
                     onClick = onOpen,
@@ -423,8 +406,6 @@ private fun Actions(
             }
         }
 
-        // Available at every risk level. The verdict the engine reached is an opinion; the user
-        // deciding this particular code is bad is a fact, and the app should take it either way.
         if (addedTo == null) {
             TextButton(onClick = onAddToBlacklist, modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -443,8 +424,6 @@ private fun Actions(
         }
     }
 }
-
-// ── payload ────────────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun PayloadCard(parsed: ParsedPayload) {
@@ -466,8 +445,7 @@ private fun PayloadCard(parsed: ParsedPayload) {
             Spacer(Modifier.height(14.dp))
             Label(stringResource(R.string.result_raw))
             Text(
-                // Neutralised for display: invisible and direction-flipping characters are shown
-                // as escapes, so the string on screen cannot differ from the string that was read.
+
                 text = highlightHost(
                     UrlParser.toDisplayString(parsed.raw),
                     parsed.host,
@@ -480,8 +458,7 @@ private fun PayloadCard(parsed: ParsedPayload) {
             Spacer(Modifier.height(14.dp))
             Label(stringResource(R.string.result_kind))
             Text(
-                // Never parsed.kind.name: that is an internal identifier, and leaking it puts
-                // "httpUrl" in front of a user who is trying to decide whether to trust a link.
+
                 stringResource(kindLabelRes(parsed.kind)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -505,8 +482,7 @@ private fun kindLabelRes(kind: PayloadKind): Int = when (kind) {
 
 @Composable
 private fun EngineNotice() {
-    // In a container like every other block of secondary copy in the app. Loose on the background
-    // it read as an afterthought appended to the verdict rather than part of it.
+
     NoteCard(stringResource(R.string.result_engine_notice))
 }
 
@@ -520,8 +496,6 @@ private fun Label(text: String) {
         modifier = Modifier.padding(bottom = 2.dp),
     )
 }
-
-// ── blacklist dialogs ──────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ListPickerDialog(

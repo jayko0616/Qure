@@ -59,15 +59,12 @@ class SignatureEngineTest {
     }
 
     @Test fun `a brand whose name is a prefix of another brand does not flag the longer one`() {
-        // Regression: "kakao" is a substring of "kakaobank", so a naive substring match reported
-        // the real kakaobank.com as an impostor of 카카오. Matching must be on whole tokens.
+
         assertTrue("brandLookalike" !in ids("https://www.kakaobank.com/"))
         assertTrue("brandLookalike" !in ids("https://kakaobank.com/login"))
-        // ...while the shorter brand is still protected on its own.
+
         assertTrue("brandLookalike" in ids("https://kakao.evil.example/"))
     }
-
-    // ── the extension points ───────────────────────────────────────────────────────────────────
 
     @Test fun `adding a host to the blocklist is enough to flag it`() {
         val custom = SignatureEngine(listOf(BlockedHostSignature(setOf("malicious.example"))))
@@ -95,10 +92,8 @@ class SignatureEngineTest {
                 listOf(Signal(id, Severity.danger, "should never appear"))
         }
         val v = runBlocking { SignatureEngine(listOf(off)).analyze(UrlParser.parse("https://a.com/")) }
-        assertTrue(v is Verdict.Failed)   // nothing enabled at all
+        assertTrue(v is Verdict.Failed)
     }
-
-    // ── the invariant that matters most ────────────────────────────────────────────────────────
 
     @Test fun `a signature that throws is never mistaken for one that found nothing`() {
         val boom = object : Signature {
@@ -110,7 +105,7 @@ class SignatureEngineTest {
                 .analyze(UrlParser.parse("https://www.naver.com/")) as Verdict.Assessed
         }
         assertTrue("boom" in v.failedSignatures)
-        // Nothing fired, but the run was incomplete — the headline must not read as an all-clear.
+
         assertNotEquals("눈에 띄는 위험 신호는 없습니다", v.headline)
     }
 

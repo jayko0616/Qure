@@ -1,5 +1,6 @@
 package com.qure.app.account
 
+import com.qure.app.demo.DemoAccounts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -28,8 +29,8 @@ class PasswordPolicyTest {
         assertTrue(PasswordRule.special in PasswordPolicy.satisfied("Qure_2026"))
     }
 
-    @Test fun `the development account password is deliberately outside the policy`() {
-        // Sign-in never runs the policy, so admin / 0000 keeps working; sign-up would refuse it.
-        assertFalse(PasswordPolicy.isValid(LocalAccountStore.adminPassword))
+    @Test fun `demo account passwords are deliberately outside the policy`() {
+
+        DemoAccounts.all.forEach { assertFalse(PasswordPolicy.isValid(it.password)) }
     }
 }

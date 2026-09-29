@@ -36,7 +36,7 @@ class UserBlacklistSignatureTest {
     }
 
     @Test fun `a blacklisted address is dangerous even when nothing else is wrong`() {
-        // The URL is structurally spotless; only the user's own list objects to it.
+
         val engine = engineWith("boring.example")
         val v = runBlocking {
             engine.analyze(UrlParser.parse("https://boring.example/")) as Verdict.Assessed

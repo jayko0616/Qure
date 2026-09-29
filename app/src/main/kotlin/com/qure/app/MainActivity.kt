@@ -9,15 +9,11 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.qure.app.account.LocalAccountStore
 import com.qure.app.account.PlanTier
 import com.qure.app.blacklist.BlacklistQuota
@@ -32,7 +28,7 @@ import com.qure.app.screen.DrawerDestination
 import com.qure.app.screen.LoginScreen
 import com.qure.app.screen.MyPageScreen
 import com.qure.app.screen.ProfileScreen
-import com.qure.app.screen.QuotaDialog
+import com.qure.app.ui.component.QuotaDialog
 import com.qure.app.screen.QureDrawerSheet
 import com.qure.app.screen.ResultScreen
 import com.qure.app.screen.ScannerScreen
@@ -40,16 +36,19 @@ import com.qure.app.screen.SignUpScreen
 import com.qure.app.signature.SignatureEngine
 import com.qure.app.signature.Signatures
 import com.qure.app.ui.theme.QureTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // targetSdk 35+ enforces edge-to-edge whether or not you opt in, so opt in and handle the
-        // insets rather than discovering the prompt sitting under the gesture bar.
+
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            // forceDark: the whole app sits on a camera preview. A light surface here is glare.
+
             QureTheme(forceDark = true) { QureApp() }
         }
     }
@@ -73,13 +72,6 @@ private fun Route.asDestination(): DrawerDestination = when (this) {
     else -> DrawerDestination.scanner
 }
 
-/**
- * Note where the camera permission gate sits: around the SCANNER only, not around the whole app.
- *
- * Wrapping everything would mean someone who declined the camera cannot reach their profile or
- * their plan, which is both annoying and slightly coercive — the app would be holding unrelated
- * screens hostage to a permission they only need for one of them.
- */
 @Composable
 private fun QureApp() {
     val context = LocalContext.current
@@ -91,18 +83,15 @@ private fun QureApp() {
     val blacklists by blacklistStore.lists.collectAsStateWithLifecycle()
     val defaultListName = stringResource(R.string.blacklist_default_name)
 
-    // The user's own lists are just one more signature. Reading them through a lambda means an edit
-    // takes effect on the very next scan without the engine being rebuilt.
-    val analyzer = remember(blacklistStore) {
-        SignatureEngine(Signatures.rules + UserBlacklistSignature { blacklistStore.allEntries() })
+    val userRule = remember(blacklistStore) {
+        UserBlacklistSignature { blacklistStore.allEntries() }
     }
+    val analyzer = remember(userRule) { SignatureEngine(Signatures.rules + userRule) }
 
-    // Signed-out users get a capped number of saved entries. Every path that can add one goes
-    // through [refusedByQuota] rather than each screen deciding for itself, so the rule cannot
-    // apply on one route and quietly not on another.
+    val deepAnalyzer = remember(userRule) { Signatures.deepEngine(extraRules = listOf(userRule)) }
+
     var quotaBlocked by remember { mutableStateOf(false) }
 
-    /** @return true when this add was refused, in which case the caller must not write. */
     fun refusedByQuota(listId: String?, value: String): Boolean {
         val targetEntries = blacklists.firstOrNull { it.id == listId }?.entries.orEmpty()
         val refused = BlacklistQuota.wouldExceed(profile.signedIn, blacklists, targetEntries, value)
@@ -114,8 +103,7 @@ private fun QureApp() {
         val targetId = blacklists.firstOrNull()?.id
         if (refusedByQuota(targetId, value)) return
         scope.launch {
-            // Land somewhere sensible rather than refusing: if the user has never made a list, the
-            // act of adding to one is a clear enough signal that they want one.
+
             val target = targetId ?: blacklistStore.createList(defaultListName)
             blacklistStore.addEntry(target, value)
         }
@@ -136,8 +124,7 @@ private fun QureApp() {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        // Edge swipe only closes, never opens. The scanner fills the screen with a live camera and
-        // an accidental edge-drag pulling the menu over it mid-scan is worse than one extra tap.
+
         gesturesEnabled = drawerState.isOpen,
         drawerContent = {
             QureDrawerSheet(
@@ -165,11 +152,11 @@ private fun QureApp() {
                 ResultScreen(
                     parsed = parsed,
                     riskAnalyzer = analyzer,
+                    deepAnalyzer = deepAnalyzer,
                     onBack = { route = Route.Scanner },
                     onOpen = {
                         LinkHandoff.open(context, parsed.raw.trim().toUri())
-                        // Return to the viewfinder, so coming back to Qure is a scanner and not a
-                        // stale verdict for a page the user has already left.
+
                         route = Route.Scanner
                     },
                     blacklists = blacklists,
@@ -179,8 +166,7 @@ private fun QureApp() {
                         }
                     },
                     onCreateListAndAdd = { name, v ->
-                        // A list that does not exist yet holds nothing, so there is no duplicate
-                        // to forgive — null target, empty entries.
+
                         if (!refusedByQuota(null, v)) {
                             scope.launch { blacklistStore.addEntry(blacklistStore.createList(name), v) }
                         }
@@ -227,8 +213,7 @@ private fun QureApp() {
                 BackHandler { route = Route.MyPage }
                 BlacklistScreen(
                     lists = blacklists,
-                    // Null means unlimited. Shown on the screen so the cap is visible before it is
-                    // hit, rather than arriving as a refusal.
+
                     quotaLimit = BlacklistQuota.entryLimit(profile.signedIn),
                     onCreateList = { name -> scope.launch { blacklistStore.createList(name) } },
                     onRenameList = { id, name -> scope.launch { blacklistStore.renameList(id, name) } },

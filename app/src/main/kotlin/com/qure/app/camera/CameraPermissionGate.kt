@@ -11,41 +11,33 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.qure.app.R
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 
 private enum class PermState { needsRequest, granted, needsRationale, permanentlyDenied }
 
-/**
- * Runs [content] only once CAMERA is granted.
- *
- * Handles the three states that actually occur on a real phone, which a bare permission request
- * does not: never asked, denied once (rationale, ask again), and denied permanently (the system
- * dialog will no longer appear at all, so the only way forward is app settings — and we have to
- * notice the user came back and granted it there).
- */
 @Composable
 fun CameraPermissionGate(content: @Composable () -> Unit) {
     val context = LocalContext.current
@@ -67,7 +59,6 @@ fun CameraPermissionGate(content: @Composable () -> Unit) {
         }
     }
 
-    // The user may grant the permission in Settings and come back; nothing else would tell us.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (state != PermState.granted && granted()) state = PermState.granted
     }

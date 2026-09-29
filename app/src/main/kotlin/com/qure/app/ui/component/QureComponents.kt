@@ -1,8 +1,7 @@
-package com.qure.app.screen
+package com.qure.app.ui.component
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,25 +9,9 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,10 +26,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,7 +38,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
@@ -69,29 +49,27 @@ import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskDanger
 import com.qure.app.ui.theme.Sizing
 import com.qure.app.ui.theme.Spacing
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 
-/**
- * The pieces every non-camera screen is built from.
- *
- * These exist because the same things were being hand-rolled per screen and drifting: two screens
- * built their own top bar, explanatory text sometimes sat in a container and sometimes floated as a
- * bare Text, and buttons came in three heights. A shared kit is not about saving lines — it is what
- * makes seven screens read as one app to somebody tapping through them for the first time.
- *
- * Nothing here holds state or makes decisions. Every component takes what it renders and reports
- * what was tapped, so swapping a screen's look never touches what the screen does.
- */
-
-// ── structure ──────────────────────────────────────────────────────────────────────────────────
-
-/**
- * The frame for every screen that is not the viewfinder.
- *
- * Both insets are consumed OUTSIDE the scroll container: applied inside, the scroll viewport still
- * extends under the navigation bar and the last control on the page ends up beneath the system
- * buttons. [bottomBar] sits below the scroll area, so a primary action can be pinned without the
- * content being able to hide it.
- */
 @Composable
 fun QureScaffold(
     title: String,
@@ -127,11 +105,7 @@ fun QureScaffold(
                 content()
                 Spacer(Modifier.height(Spacing.xxl))
             }
-            // union, not both: the IME inset already covers the navigation bar, so applying the two
-            // paddings in sequence would lift the button a nav-bar's height above the keyboard.
-            // Taking the larger of the two puts it exactly on top of whichever is showing — without
-            // this the pinned action sits UNDER the keyboard, which is where it lands the moment
-            // somebody types in the last field and looks for the button.
+
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -148,12 +122,6 @@ fun QureScaffold(
     }
 }
 
-/**
- * The wordmark, used wherever a screen would otherwise open with an anonymous form.
- *
- * Reuses the app's own name and accent rather than an image, so it costs nothing to ship and can
- * never fall out of step with the theme.
- */
 @Composable
 fun BrandMark(
     modifier: Modifier = Modifier,
@@ -177,7 +145,6 @@ fun BrandMark(
     }
 }
 
-/** A small caps-ish label that opens a group of related controls. */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -189,12 +156,6 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * Explanatory copy that belongs to the screen rather than to a control.
- *
- * Replaces the previous `InfoCard`, which despite the name rendered a bare Text — the reason
- * secondary copy floated loose on some screens and sat inside a container on others.
- */
 @Composable
 fun NoteCard(text: String, modifier: Modifier = Modifier) {
     Surface(
@@ -211,13 +172,6 @@ fun NoteCard(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * What a screen shows when there is genuinely nothing to show.
- *
- * Built from an icon the app already ships, the type scale and one accent — no illustration asset.
- * An empty screen carrying a line of grey text reads as broken; the same words under a centred
- * glyph read as a state the designer knew about.
- */
 @Composable
 fun EmptyState(
     icon: ImageVector,
@@ -264,18 +218,6 @@ fun EmptyState(
     }
 }
 
-// ── controls ───────────────────────────────────────────────────────────────────────────────────
-
-/**
- * The app's primary action.
- *
- * [loading] is the reason this exists rather than a bare Button: every auth screen already tracked
- * a `busy` flag and did nothing with it but grey the button out, which is indistinguishable from a
- * form that refuses to submit.
- *
- * Disabled colours are explicit. Material's defaults are low-contrast tints of the surface, which
- * on this app's near-black background vanish entirely.
- */
 @Composable
 fun PrimaryButton(
     text: String,
@@ -310,7 +252,6 @@ fun PrimaryButton(
     }
 }
 
-/** The quieter sibling. Same height and shape, so a stacked pair lines up. */
 @Composable
 fun SecondaryButton(
     text: String,
@@ -333,7 +274,6 @@ fun SecondaryButton(
     }
 }
 
-/** One text field shape for the whole app, with room for a leading glyph. */
 @Composable
 fun QureTextField(
     value: String,
@@ -371,13 +311,6 @@ fun QureTextField(
     )
 }
 
-/**
- * A password field with a reveal toggle.
- *
- * The toggle changes nothing about what is submitted — it only decides whether the characters
- * already in the field are rendered as dots. Typing a password blind on a phone keyboard is where
- * most failed sign-ins come from.
- */
 @Composable
 fun PasswordField(
     value: String,
@@ -417,17 +350,6 @@ fun PasswordField(
     )
 }
 
-/**
- * What a signed-out user sees when they run out of saved entries.
- *
- * Deliberately a dialog they can dismiss, not a wall. Whatever they were doing is still there
- * underneath, every entry they already saved still works, and the scan that prompted this was
- * already answered in full — the cap is on storage, never on the verdict.
- *
- * [onSignUp] is null where there is nowhere to send them, which is the case on the stock-camera
- * overlay: it is a transient window over somebody else's app and pulling them into a sign-up form
- * from there would be a worse intrusion than the limit it is explaining.
- */
 @Composable
 fun QuotaDialog(
     limit: Int,
@@ -479,9 +401,6 @@ fun QuotaDialog(
     )
 }
 
-// ── small pieces ───────────────────────────────────────────────────────────────────────────────
-
-/** The plan, as a pill. Yellow is reserved for Pro so the free state never looks "on". */
 @Composable
 fun TierChip(tier: PlanTier, modifier: Modifier = Modifier) {
     val pro = tier == PlanTier.pro
@@ -498,24 +417,23 @@ fun TierChip(tier: PlanTier, modifier: Modifier = Modifier) {
     )
 }
 
-/** A count or status badge that sits beside a title. */
 @Composable
-fun CountBadge(text: String, modifier: Modifier = Modifier, accent: Boolean = false) {
+fun CountBadge(text: String, modifier: Modifier = Modifier, tint: Color? = null) {
+
     Text(
         text,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.SemiBold,
-        color = if (accent) QrYellow else MaterialTheme.colorScheme.onSurfaceVariant,
+        color = tint ?: MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier
             .background(
-                if (accent) QrYellow.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant,
+                tint?.copy(alpha = 0.14f) ?: MaterialTheme.colorScheme.surfaceVariant,
                 Radius.pill,
             )
             .padding(horizontal = Spacing.sm, vertical = 2.dp),
     )
 }
 
-/** A circular avatar carrying an initial, or a placeholder when signed out. */
 @Composable
 fun InitialAvatar(initial: String?, modifier: Modifier = Modifier) {
     val signedIn = !initial.isNullOrBlank()
@@ -537,7 +455,6 @@ fun InitialAvatar(initial: String?, modifier: Modifier = Modifier) {
     }
 }
 
-/** A row of stacked actions with consistent spacing, so screens stop inventing their own gaps. */
 @Composable
 fun ActionStack(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(

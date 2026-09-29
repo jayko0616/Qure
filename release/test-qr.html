@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qure 테스트 QR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --surface: #15181d;
+    --line: #232830;
+    --fg: #e6e9ee;
+    --muted: #a8b2be;
+    --safe: #35c759;
+    --caution: #ffb020;
+    --danger: #ff453a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px 64px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  }
+  header { max-width: 1200px; margin: 0 auto 28px; }
+  h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
+  .grid {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .card.safe { border-left-color: var(--safe); }
+  .card.caution { border-left-color: var(--caution); }
+  .card.danger { border-left-color: var(--danger); }
+  .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .title { font-size: 15px; font-weight: 700; }
+  .score { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .safe .score, .safe .title { color: var(--safe); }
+  .caution .score, .caution .title { color: var(--caution); }
+  .danger .score, .danger .title { color: var(--danger); }
+  .qr {
+    background: #fff; border-radius: 12px; padding: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qr img, .qr canvas { display: block; }
+  .payload {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; line-height: 1.5; color: var(--fg);
+    word-break: break-all; background: #0b0d10;
+    border-radius: 8px; padding: 8px 10px;
+  }
+  .rule { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .rule b { color: var(--fg); font-weight: 600; }
+  .warn { font-size: 11px; color: var(--caution); line-height: 1.5; }
+  .ghead { grid-column: 1/-1; font-size: 13px; font-weight: 700; color: var(--muted);
+           margin: 14px 0 -4px; letter-spacing: .02em; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) { --bg: #fafafc; --surface: #fff; --line: #e4e6ea; --fg: #14171c; --muted: #5c6672; }
+    :root:not([data-theme="dark"]) .payload { background: #f2f3f6; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Qure 테스트 QR</h1>
+  <p>각 카드의 색과 점수는 현재 규칙으로 계산한 <b>기대값</b>입니다. 폰에 뜬 값이 다르면 그게 버그입니다.</p><p style='margin-top:10px'><b>⚠ 표시가 붙은 카드</b>는 존재하지 않는 도메인이라 2차 검사가 실패합니다. 화면에 <b>&ldquo;일부 검사 규칙이 실행되지 않아 결과가 불완전합니다&rdquo;</b>가 뜨는 게 <b>정상</b>입니다 — 네트워크 실패를 안전으로 읽지 않는다는 설계가 동작하는 증거입니다.</p>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--safe)"></i>안전 85–100</span>
+    <span><i class="dot" style="background:var(--caution)"></i>주의 40–84</span>
+    <span><i class="dot" style="background:var(--danger)"></i>위험 0–39</span>
+  </div>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const CASES = [
+  { group:'2차 검사 — 실제로 목적지를 따라갑니다', level:'caution', score:'67', title:'리다이렉트 추적', rule:'<b>noHttps</b> + <b>redirect</b> · 2홉 뒤 www.google.com',
+    text:'http://google.com/ncr' },
+
+  { group:'2차', level:'caution', score:'72', title:'네이버 리다이렉트', rule:'<b>noHttps</b> + <b>redirect</b> · www.naver.com 도착',
+    text:'http://naver.com' },
+
+  { group:'2차', level:'caution', score:'72', title:'은행 http 진입', rule:'<b>noHttps</b> + <b>redirect</b> · https로 승격되는 정상 사례',
+    text:'http://www.kakaobank.com' },
+
+  { group:'2차', level:'caution', score:'72', title:'단축 도메인 이동', rule:'<b>shortener</b> + <b>redirect</b> · bitly.com 으로 이동',
+    text:'http://bit.ly' },
+
+  { group:'1차 — 오프라인 규칙만으로 판정', level:'safe', score:'100', title:'정상 링크', rule:'아무 규칙도 발동 안 함 · <b>브랜드 오탐 확인용</b>. 2차까지 통과해 만점',
+    text:'https://www.kakaobank.com' },
+
+  { group:'1차', level:'danger', score:'15', title:'@ 주소 위장', rule:'<b>userinfo</b> · 실제 접속지는 evil.example', incomplete:true,
+    text:'https://www.kakaobank.com@evil.example/login' },
+
+  { group:'1차', level:'danger', score:'15', title:'브랜드 사칭', rule:'<b>brandLookalike</b> · 카카오뱅크 사칭', incomplete:true,
+    text:'https://kakaobank-login.evil.example/auth' },
+
+  { group:'1차', level:'danger', score:'30', title:'IP 직접 접속', rule:'<b>ipHost</b> + <b>noHttps</b>', incomplete:true,
+    text:'http://192.168.0.1/pay' },
+
+  { group:'1차', level:'danger', score:'30', title:'퓨니코드 도메인', rule:'<b>punycode</b> · 다른 문자를 흉내 낸 도메인', incomplete:true,
+    text:'https://xn--kakaobnk-x51d.com/login' },
+
+  { group:'1차', level:'danger', score:'30', title:'앱 실행 코드', rule:'<b>payloadKind</b> · 웹 주소가 아니라 2차 검사는 건너뜀',
+    text:'intent://scan/#Intent;scheme=zxing;package=com.google.zxing;end' },
+
+  { group:'1차', level:'caution', score:'72', title:'단축 주소 (죽은 링크)', rule:'<b>shortener</b> · 404라 이동 없음',
+    text:'https://bit.ly/3xR2k9Q' },
+
+  { group:'1차', level:'caution', score:'72', title:'HTTPS 아님', rule:'<b>noHttps</b> · 리다이렉트 없음',
+    text:'http://example.com/login' },
+
+  { group:'1차', level:'caution', score:'72', title:'비표준 포트', rule:'<b>nonStandardPort</b> · 8443', incomplete:true,
+    text:'https://example.com:8443/pay' },
+
+  { group:'1차', level:'caution', score:'72', title:'깊은 서브도메인', rule:'<b>subdomainDepth</b> · 7단계', incomplete:true,
+    text:'https://kb.star.login.secure.verify.example.com/' },
+
+  { group:'1차', level:'caution', score:'72', title:'Wi-Fi 접속 정보', rule:'<b>payloadKind</b> · 웹 주소가 아니라 2차 검사는 건너뜀',
+    text:'WIFI:S:Free_Airport_WiFi;T:WPA;P:12345678;;' },
+
+  { group:'1차', level:'caution', score:'79', title:'위험 TLD', rule:'<b>riskyTld</b> · .top (info 단독)', incomplete:true,
+    text:'https://login-secure.top/verify' },
+];
+
+const grid = document.getElementById('grid');
+let lastGroup = null;
+for (const c of CASES) {
+  if (c.group && c.group !== '1차' && c.group !== '2차' && c.group !== lastGroup) {
+    const h = document.createElement('div');
+    h.className = 'ghead'; h.textContent = c.group; grid.appendChild(h);
+    lastGroup = c.group;
+  }
+  const card = document.createElement('div');
+  card.className = 'card ' + c.level;
+  card.innerHTML =
+    '<div class="top"><span class="title">' + c.title + '</span><span class="score">' + c.score + '</span></div>' +
+    '<div class="qr"></div>' +
+    '<div class="payload"></div>' +
+    '<div class="rule">' + c.rule + '</div>' +
+    (c.incomplete ? '<div class="warn">⚠ 2차 검사 실패 → &ldquo;불완전&rdquo; 표시가 뜹니다</div>' : '');
+  // textContent, never innerHTML: these payloads are the hostile strings under test.
+  card.querySelector('.payload').textContent = c.text;
+  grid.appendChild(card);
+  new QRCode(card.querySelector('.qr'), {
+    text: c.text,
+    width: 200,
+    height: 200,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+}
+</script>
+
+</body>
+</html>

@@ -1,29 +1,16 @@
 package com.qure.app.account
 
 import android.content.Context
-import androidx.core.content.edit
+import com.qure.app.demo.DemoAccounts
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.security.SecureRandom
+import androidx.core.content.edit
+import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * A device-local stand-in for a real account service.
- *
- * Holds one built-in account (admin / 0000, Pro, "관리자") for development, plus whatever the user
- * registers on this device. Passwords are salted and hashed even here: a prototype store has a way
- * of surviving into the first release, and plaintext in SharedPreferences is exactly the kind of
- * thing that does.
- *
- * [SecureRandom] is still here for the per-account salt. It used to also mint verification codes;
- * see the note on [AccountRepository.signUp] for why that step is gone.
- *
- * Replace the whole class, not parts of it, when a backend arrives; nothing outside the
- * [AccountRepository] interface knows this exists.
- */
 class LocalAccountStore(context: Context) : AccountRepository {
 
     private val prefs = context.applicationContext
@@ -38,9 +25,14 @@ class LocalAccountStore(context: Context) : AccountRepository {
         val id = userId.trim()
         if (id.isEmpty() || password.isEmpty()) return AuthResult.Failure(AuthError.emptyField)
 
-        if (id.equals(adminId, ignoreCase = true) && password == adminPassword) {
+        DemoAccounts.match(id, password)?.let { demo ->
             writeProfile(
-                UserProfile(signedIn = true, userId = adminId, displayName = adminName, tier = PlanTier.pro),
+                UserProfile(
+                    signedIn = true,
+                    userId = demo.id,
+                    displayName = demo.displayName,
+                    tier = demo.tier,
+                ),
             )
             return AuthResult.Success
         }
@@ -62,7 +54,7 @@ class LocalAccountStore(context: Context) : AccountRepository {
             return AuthResult.Failure(AuthError.emptyField)
         }
         val users = readUsers()
-        if (id.equals(adminId, ignoreCase = true) || users.any { it.id.equals(id, ignoreCase = true) }) {
+        if (DemoAccounts.isReserved(id) || users.any { it.id.equals(id, ignoreCase = true) }) {
             return AuthResult.Failure(AuthError.duplicateId)
         }
         if (!PasswordPolicy.isValid(password)) return AuthResult.Failure(AuthError.weakPassword)
@@ -77,8 +69,7 @@ class LocalAccountStore(context: Context) : AccountRepository {
     }
 
     override suspend fun signOut() {
-        // Signed out means anonymous, and anonymous is the free tier. The plan belongs to the
-        // account and comes back with it on the next sign-in.
+
         writeProfile(UserProfile())
     }
 
@@ -86,11 +77,10 @@ class LocalAccountStore(context: Context) : AccountRepository {
         val current = state.value
         writeProfile(current.copy(tier = tier))
         val id = current.userId ?: return
-        if (id == adminId) return   // the built-in account is always Pro again on the next sign-in
+
+        if (DemoAccounts.isReserved(id)) return
         writeUsers(readUsers().map { if (it.id == id) it.copy(tier = tier) else it })
     }
-
-    // ── persistence ────────────────────────────────────────────────────────────────────────────
 
     private data class StoredUser(
         val id: String,
@@ -133,7 +123,7 @@ class LocalAccountStore(context: Context) : AccountRepository {
                         .getOrDefault(PlanTier.free),
                 )
             }
-        }.getOrDefault(emptyList())   // Corrupt storage loses the accounts; it must never crash the app.
+        }.getOrDefault(emptyList())
     }
 
     private fun writeUsers(users: List<StoredUser>) {
@@ -163,11 +153,6 @@ class LocalAccountStore(context: Context) : AccountRepository {
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     companion object {
-        /** Built-in development account. Signs in as the Pro tier so paid paths can be exercised. */
-        const val adminId = "admin"
-        const val adminPassword = "0000"
-        const val adminName = "관리자"
-
         private const val keySignedIn = "signedIn"
         private const val keyUserId = "userId"
         private const val keyName = "displayName"

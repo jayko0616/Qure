@@ -6,16 +6,6 @@ import com.qure.app.domain.Signal
 import com.qure.app.signature.Brand
 import com.qure.app.signature.Signature
 
-/**
- * Rules whose behaviour is entirely determined by the data handed to them.
- *
- * These are the ones to reach for when the new detection is "one more domain" rather than "one more
- * idea": add the string to the corresponding list in `Signatures.kt` and it takes effect. The data
- * is a constructor parameter rather than a direct reference to `Signatures`, which is what keeps
- * that file free to import these without a cycle — and what lets tests hand in their own lists.
- */
-
-/** Known-bad hosts. An exact match, or any subdomain of one. */
 class BlockedHostSignature(private val hosts: Set<String>) : Signature {
     override val id = "blockedHost"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> {
@@ -33,7 +23,6 @@ class BlockedHostSignature(private val hosts: Set<String>) : Signature {
     }
 }
 
-/** Substrings anywhere in the raw payload. Blunt, but useful for campaign-specific strings. */
 class BlockedPatternSignature(private val patterns: Set<String>) : Signature {
     override val id = "blockedPattern"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> {
@@ -51,10 +40,6 @@ class BlockedPatternSignature(private val patterns: Set<String>) : Signature {
     }
 }
 
-/**
- * Shorteners hide the destination, which is the whole point of using one in a quishing campaign.
- * Note this is a warning, not a verdict: the deep pass resolves the redirect and judges the target.
- */
 class ShortenerSignature(private val shorteners: Set<String>) : Signature {
     override val id = "shortener"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> {
@@ -87,16 +72,6 @@ class RiskyTldSignature(private val tlds: Set<String>) : Signature {
     }
 }
 
-/**
- * Catches a domain that mentions a protected brand without actually being it —
- * "kakaobank.evil.example", "kakaobank-login.net", "kakaobank.com.evil.net".
- *
- * Matching is on whole tokens, never on raw substrings. A substring test looks fine until you
- * notice that "kakao" occurs inside "kakaobank", at which point the rule reports the REAL
- * kakaobank.com as an impostor of 카카오 — a false positive on the bank itself, which is about the
- * worst output an anti-phishing tool can produce. Hosts are split on dots and then on any
- * non-alphanumeric, and the brand label has to equal one of the resulting tokens.
- */
 class BrandLookalikeSignature(private val brands: List<Brand>) : Signature {
     override val id = "brandLookalike"
 
@@ -119,7 +94,6 @@ class BrandLookalikeSignature(private val brands: List<Brand>) : Signature {
         )
     }
 
-    /** "kakaobank-login.evil.example" -> [kakaobank, login, evil, example] */
     private fun tokenize(host: String): Set<String> =
         host.lowercase()
             .split('.')

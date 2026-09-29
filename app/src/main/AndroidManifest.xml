@@ -1,18 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No package= attribute: it is a hard error under AGP 9. The namespace in build.gradle.kts wins. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- required=false keeps the app installable on a camera-less device; the permission gate
-         already handles the case where no camera is usable. -->
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
-    <!-- Deliberately absent: INTERNET. Milestone 1 decides everything on-device, and not holding
-         the permission is a stronger statement than promising not to use it. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Package visibility (Android 11+): needed to find a real browser to hand a link to.
-         Scoped to exactly that question rather than QUERY_ALL_PACKAGES, which would be a far
-         broader grant than this app has any business holding. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -28,6 +22,7 @@
 
     <application
         android:allowBackup="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -46,15 +41,6 @@
             </intent-filter>
         </activity>
 
-        <!-- The stock-camera path. Registering these schemes is what makes Qure a "browser app" in
-             the platform's eyes, which since Android 12 is the ONLY way to be offered an unverified
-             web link at all. It still does nothing until the user grants the default-browser role.
-
-             taskAffinity="": stays out of MainActivity's task, so dismissing it returns the user to
-             the camera they were in rather than to Qure's scanner.
-             excludeFromRecents: a transient prompt has no business in the recents list.
-             filterTouchesWhenObscured: refuses taps delivered through another app's overlay, so a
-             hostile window cannot drive the "open anyway" button from on top. -->
         <activity
             android:name=".link.InspectActivity"
             android:exported="true"

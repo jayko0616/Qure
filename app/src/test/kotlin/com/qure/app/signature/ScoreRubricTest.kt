@@ -12,11 +12,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The score is a display value placed inside the band the colour already chose. These tests pin
- * the band edges, the worked examples from the design brief, and the one property that matters
- * most: the number can never move the colour.
- */
 class ScoreRubricTest {
 
     private val engine = SignatureEngine()
@@ -24,8 +19,6 @@ class ScoreRubricTest {
     private fun assess(url: String, e: SignatureEngine = engine): Verdict.Assessed = runBlocking {
         e.analyze(UrlParser.parse(url)) as Verdict.Assessed
     }
-
-    // ── bands ──────────────────────────────────────────────────────────────────────────────────
 
     @Test fun `bands are disjoint and cover 0 to 100 with no gap`() {
         assertEquals(ScoreRubric.greenFloor, ScoreRubric.yellowCeiling + 1)
@@ -63,8 +56,6 @@ class ScoreRubricTest {
         }
     }
 
-    // ── worked examples ────────────────────────────────────────────────────────────────────────
-
     @Test fun `a clean offline verdict is 97`() {
         assertEquals(97, assess("https://www.naver.com/").score)
     }
@@ -80,24 +71,24 @@ class ScoreRubricTest {
     }
 
     @Test fun `an info signal costs 5 on top of a warning`() {
-        // noHttps (warn) + riskyTld .xyz (info)
+
         assertEquals(67, assess("http://shop.example.xyz/login").score)
     }
 
     @Test fun `the strongest dangers start at 15, other dangers at 30`() {
-        assertEquals(15, assess("https://www.kakaobank.com@evil.example/login").score)   // userinfo
-        assertEquals(15, assess("https://kakaobank-login.evil.example/").score)          // brandLookalike
-        assertEquals(30, assess("https://192.168.0.9/pay").score)                        // ipHost
-        assertEquals(30, assess("https://xn--80ak6aa92e.com/login").score)               // punycode
+        assertEquals(15, assess("https://www.kakaobank.com@evil.example/login").score)
+        assertEquals(15, assess("https://kakaobank-login.evil.example/").score)
+        assertEquals(30, assess("https://192.168.0.9/pay").score)
+        assertEquals(30, assess("https://xn--80ak6aa92e.com/login").score)
     }
 
     @Test fun `each additional danger costs 8`() {
-        // userinfo (strongest, 15) + ipHost (-8)
+
         assertEquals(7, assess("https://www.kbstar.com@203.0.113.5/").score)
     }
 
     @Test fun `warnings do not move a red score`() {
-        // Same danger, with and without the noHttps warning.
+
         assertEquals(assess("https://192.168.0.9/pay").score, assess("http://192.168.0.9/pay").score)
     }
 
@@ -113,18 +104,16 @@ class ScoreRubricTest {
         }
         val v = assess("https://www.naver.com/", SignatureEngine(listOf(boom, IpHostSignature)))
         assertEquals(RiskLevel.safe, v.level)
-        assertEquals(92, v.score)   // 100 - 5 (failed rule) - 3 (offline only)
+        assertEquals(92, v.score)
         assertTrue("boom" in v.failedSignatures)
         assertEquals(listOf("ipHost"), v.ranSignatures)
     }
 
-    // ── the invariant ──────────────────────────────────────────────────────────────────────────
-
     @Test fun `many warnings pile up inside yellow and never cross into red`() {
-        // noHttps + subdomainDepth + nonStandardPort + controlChar (4 warns) + riskyTld (info)
+
         val v = assess("http://a.b.c.d.e.f.example.top:8080/")
         assertEquals(RiskLevel.caution, v.level)
-        assertEquals(43, v.score)                       // 84 - 12 - 8*3 - 5
+        assertEquals(43, v.score)
         assertEquals(RiskLevel.caution, ScoreRubric.bandOf(v.score))
     }
 
@@ -136,9 +125,7 @@ class ScoreRubricTest {
     }
 
     @Test fun `a signal carries no number of its own`() {
-        // The whole point of keeping penalties inside the rubric: nothing on a Signal can leak a
-        // per-item cost to the screen. If a field like displayPenalty is ever added, this fails.
-        // Instance fields only: the Compose compiler adds a static `$stable` marker to every class.
+
         val fields = Signal::class.java.declaredFields
             .filter { !java.lang.reflect.Modifier.isStatic(it.modifiers) && !it.isSynthetic }
             .map { it.name }

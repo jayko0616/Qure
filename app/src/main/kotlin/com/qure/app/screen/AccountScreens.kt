@@ -2,41 +2,28 @@ package com.qure.app.screen
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Block
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.qure.app.R
 import com.qure.app.account.PlanTier
 import com.qure.app.account.UserProfile
@@ -44,15 +31,29 @@ import com.qure.app.ui.theme.QrYellow
 import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskSafe
 import com.qure.app.ui.theme.Spacing
+import com.qure.app.ui.component.CountBadge
+import com.qure.app.ui.component.InitialAvatar
+import com.qure.app.ui.component.NoteCard
+import com.qure.app.ui.component.PrimaryButton
+import com.qure.app.ui.component.QureScaffold
+import com.qure.app.ui.component.SecondaryButton
+import com.qure.app.ui.component.TierChip
+import com.qure.app.ui.component.ActionStack
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 
-/**
- * 회원 프로필 — who is signed in, and how to change that.
- *
- * The signed-out state is the one that needed the work. It used to be a grey "?" circle beside two
- * lines of text, pinned to the top of an otherwise empty screen. Centring the identity block and
- * giving the explanation a container turns a page that looked unfinished into one that looks like
- * it is telling you something deliberate: you do not need an account to use this app.
- */
 @Composable
 fun ProfileScreen(
     profile: UserProfile,
@@ -128,13 +129,6 @@ fun ProfileScreen(
     }
 }
 
-/**
- * 마이페이지 — a short menu rather than one long page.
- *
- * The plan stays collapsed by default: it is a thing you set once and then rarely think about, so
- * it should not be the wall of text standing between the user and the list they came here to edit.
- * The summary row at the top is new — the screen previously gave no indication of whose page it was.
- */
 @Composable
 fun MyPageScreen(
     profile: UserProfile,
@@ -176,6 +170,8 @@ fun MyPageScreen(
                 PlanCard(
                     title = stringResource(R.string.plan_pro),
                     selected = profile.tier == PlanTier.pro,
+
+                    locked = !profile.signedIn,
                     onSelect = { onChangeTier(PlanTier.pro) },
                     lines = listOf(
                         stringResource(R.string.feat_redirect) to false,
@@ -201,9 +197,6 @@ fun MyPageScreen(
     }
 }
 
-// ── pieces ─────────────────────────────────────────────────────────────────────────────────────
-
-/** Who this page belongs to. Compact on purpose — it orients, it is not the content. */
 @Composable
 private fun AccountSummary(profile: UserProfile) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -301,26 +294,24 @@ private fun MenuRow(
     }
 }
 
-/**
- * A tier, as a card the user can tap to switch to.
- *
- * The selection lives on the device for now, which is fine while it only decides what the UI shows.
- * When a Pro feature actually costs something to run, the entitlement check belongs on the server —
- * a tier held only on the handset is a display hint, not an authorisation decision. See the note on
- * AccountRepository.
- */
 @Composable
 private fun PlanCard(
     title: String,
     selected: Boolean,
     onSelect: () -> Unit,
     lines: List<Pair<String, Boolean>>,
+    locked: Boolean = false,
 ) {
     Card(
         onClick = onSelect,
+        enabled = !locked,
         shape = Radius.card,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = if (selected) BorderStroke(2.dp, QrYellow) else null,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+        ),
+        border = if (selected) BorderStroke(2.dp, RiskSafe) else null,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(Spacing.lg)) {
@@ -333,11 +324,29 @@ private fun PlanCard(
                     title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (selected) QrYellow else MaterialTheme.colorScheme.onSurface,
+                    color = if (selected) RiskSafe else MaterialTheme.colorScheme.onSurface,
                 )
-                if (selected) {
-                    CountBadge(stringResource(R.string.mypage_current_plan), accent = true)
+                when {
+                    selected -> CountBadge(
+                        stringResource(R.string.mypage_current_plan),
+                        tint = RiskSafe,
+                    )
+                    locked -> Icon(
+                        Icons.Outlined.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
+            }
+            if (locked) {
+
+                Spacer(Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.plan_sign_in_required),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Spacer(Modifier.height(Spacing.md))
             lines.forEach { (text, available) ->
@@ -359,8 +368,7 @@ private fun PlanCard(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (!available) {
-                            // Say so on the feature itself. A paid tier that lists things it cannot
-                            // do yet is a promise the app has not earned.
+
                             Text(
                                 stringResource(R.string.feat_pending),
                                 style = MaterialTheme.typography.labelSmall,

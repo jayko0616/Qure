@@ -1,22 +1,13 @@
 package com.qure.app.blacklist
 
 import android.content.Context
-import androidx.core.content.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.core.content.edit
+import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Device-local storage for the user's blacklists.
- *
- * Persisted as JSON in SharedPreferences via org.json, which ships with the platform — a list of
- * strings does not justify pulling in a serialisation library and the build already carries enough.
- *
- * Note what is NOT stored: scan history. Entries are only ever here because the user explicitly put
- * them here, so this file never accumulates a record of what someone scanned.
- */
 class LocalBlacklistStore(context: Context) : BlacklistRepository {
 
     private val prefs = context.applicationContext
@@ -46,8 +37,7 @@ class LocalBlacklistStore(context: Context) : BlacklistRepository {
         if (trimmed.isEmpty()) return
         write(
             state.value.map { list ->
-                // Adding the same thing twice is a no-op rather than an error: the user tapping
-                // "add" again on a code already on the list means they want it on the list.
+
                 if (list.id == listId && trimmed !in list.entries) {
                     list.copy(entries = list.entries + trimmed)
                 } else list
@@ -79,8 +69,6 @@ class LocalBlacklistStore(context: Context) : BlacklistRepository {
 
     override fun allEntries(): List<String> = state.value.flatMap { it.entries }
 
-    // ── persistence ────────────────────────────────────────────────────────────────────────────
-
     private fun read(): List<Blacklist> {
         val raw = prefs.getString(keyLists, null) ?: return emptyList()
         return runCatching {
@@ -94,7 +82,7 @@ class LocalBlacklistStore(context: Context) : BlacklistRepository {
                     entries = (0 until entries.length()).map { entries.getString(it) },
                 )
             }
-        }.getOrDefault(emptyList())   // Corrupt storage loses the lists; it must never crash the app.
+        }.getOrDefault(emptyList())
     }
 
     private fun write(lists: List<Blacklist>) {

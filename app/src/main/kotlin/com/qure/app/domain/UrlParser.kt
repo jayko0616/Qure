@@ -1,20 +1,7 @@
 package com.qure.app.domain
 
-/**
- * Turns a raw QR payload into [ParsedPayload].
- *
- * Deliberately does NOT use android.net.Uri. Uri normalises, lowercases and returns null on exactly
- * the malformed authorities attackers rely on, which means the string you analyse stops matching the
- * string the platform will actually open — the analyser ends up reasoning about a different URL than
- * the one the user is about to visit. So the browser's own rules are reproduced here, including the
- * one that matters most: the host is whatever follows the LAST '@'.
- *
- * This object is expected to stay still. Detection rules live in the signature package and change
- * freely; parsing does not, because every rule downstream trusts it.
- */
 object UrlParser {
 
-    /** Characters browsers strip from a URL outright before parsing. */
     private val strippedChars = charArrayOf('\t', '\n', '\r')
 
     private val bidiControls = setOf(
@@ -41,7 +28,7 @@ object UrlParser {
         }
 
         val authority = extractAuthority(raw, scheme ?: "")
-        // The rule that defeats https://www.kakaobank.com@evil.example/login
+
         val atIndex = authority.lastIndexOf('@')
         val userInfo = if (atIndex >= 0) authority.substring(0, atIndex) else null
         val hostPort = if (atIndex >= 0) authority.substring(atIndex + 1) else authority
@@ -63,10 +50,6 @@ object UrlParser {
         )
     }
 
-    /**
-     * Renders a payload safe to PUT ON SCREEN. Invisible and direction-flipping characters become
-     * visible escapes, so a payload can never paint a different string than the one it is.
-     */
     fun toDisplayString(raw: String, max: Int = 300): String {
         val sb = StringBuilder(raw.length)
         for (ch in raw.take(max)) {
@@ -81,8 +64,6 @@ object UrlParser {
         if (raw.length > max) sb.append('…')
         return sb.toString()
     }
-
-    // ── internals ──────────────────────────────────────────────────────────────────────────
 
     private fun extractScheme(s: String): String? {
         val colon = s.indexOf(':')
@@ -102,22 +83,21 @@ object UrlParser {
         scheme == "geo" -> PayloadKind.geo
         scheme == "intent" || scheme == "android-app" -> PayloadKind.appIntent
         scheme != null -> PayloadKind.otherScheme
-        // A bare "kakaobank.com/login" is still a link to a human eye.
+
         raw.contains('.') && !raw.contains(' ') -> PayloadKind.httpUrl
         else -> PayloadKind.plainText
     }
 
-    /** Authority = everything after the scheme's slashes, up to the first /, \, ?, or #. */
     private fun extractAuthority(raw: String, scheme: String): String {
         var i = if (scheme.isNotEmpty() && raw.startsWith("$scheme:", true)) scheme.length + 1 else 0
-        // Browsers tolerate any run of / and \ here, including none and including three.
+
         while (i < raw.length && (raw[i] == '/' || raw[i] == '\\')) i++
         val end = raw.drop(i).indexOfFirst { it == '/' || it == '\\' || it == '?' || it == '#' }
         return if (end < 0) raw.substring(i) else raw.substring(i, i + end)
     }
 
     private fun splitHostPort(hostPort: String): Pair<String, String?> {
-        if (hostPort.startsWith("[")) {                 // IPv6 literal
+        if (hostPort.startsWith("[")) {
             val close = hostPort.indexOf(']')
             if (close < 0) return hostPort to null
             return hostPort.substring(0, close + 1) to
@@ -129,7 +109,6 @@ object UrlParser {
         } else hostPort to null
     }
 
-    /** Covers dotted, bare-decimal (http://2130706433/) and hex forms, plus IPv6 literals. */
     private fun isIpLiteral(host: String): Boolean {
         if (host.startsWith("[") && host.endsWith("]")) return true
         if (host.isEmpty()) return false

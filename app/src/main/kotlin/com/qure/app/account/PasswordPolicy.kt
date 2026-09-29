@@ -1,13 +1,7 @@
 package com.qure.app.account
 
-/** One requirement a password has to meet. The sign-up form shows each as a checklist row. */
 enum class PasswordRule { minLength, special, lowercase, uppercase }
 
-/**
- * The password rules, as a pure function so the form can show live feedback and the store can
- * refuse a weak password with the same logic. Applied at sign-up only: sign-in checks what was
- * registered, and the built-in development account deliberately does not meet these.
- */
 object PasswordPolicy {
 
     const val minLengthChars = 8

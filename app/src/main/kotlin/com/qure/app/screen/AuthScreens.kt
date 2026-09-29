@@ -2,42 +2,27 @@ package com.qure.app.screen
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.unit.dp
 import com.qure.app.R
 import com.qure.app.account.AuthError
 import com.qure.app.account.AuthResult
@@ -48,19 +33,29 @@ import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskDanger
 import com.qure.app.ui.theme.RiskSafe
 import com.qure.app.ui.theme.Spacing
+import com.qure.app.ui.component.BrandMark
+import com.qure.app.ui.component.PasswordField
+import com.qure.app.ui.component.PrimaryButton
+import com.qure.app.ui.component.QureScaffold
+import com.qure.app.ui.component.QureTextField
+import com.qure.app.ui.component.SectionLabel
+import com.qure.app.ui.component.ActionStack
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
-/**
- * 로그인.
- *
- * The screen owns its form state and hands the credentials to [onSubmit]; whatever the repository
- * answers is mapped to a sentence under the fields. Nothing here knows whether the check happened
- * on the device or on a server, which is what lets the backend arrive without a UI change.
- *
- * The wordmark at the top is not decoration. Without it this screen is an anonymous pair of text
- * fields that could belong to any app — and it is one of the first places somebody evaluating Qure
- * ends up.
- */
 @Composable
 fun LoginScreen(
     onSubmit: suspend (userId: String, password: String) -> AuthResult,
@@ -140,18 +135,6 @@ fun LoginScreen(
     }
 }
 
-/**
- * 회원가입: name, id, password.
- *
- * There is no verification step. One used to sit at the bottom of this form, and it was theatre —
- * the code was generated on the device, printed on this very screen, and checked against itself.
- * See the note on [com.qure.app.account.AccountRepository.signUp]: it comes back when there is a
- * server on the other end to send it.
- *
- * The password rules are a live checklist rather than something discovered on submit, and each row
- * carries a filled check when it is met. The previous version distinguished met from unmet by the
- * colour of a 7dp dot, which is close to no signal at all.
- */
 @Composable
 fun SignUpScreen(
     onSubmit: suspend (name: String, userId: String, password: String) -> AuthResult,
@@ -236,8 +219,6 @@ fun SignUpScreen(
     }
 }
 
-// ── pieces ─────────────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun PasswordChecklist(satisfied: Set<PasswordRule>) {
     Surface(
@@ -288,10 +269,6 @@ private fun RuleRow(text: String, met: Boolean) {
     }
 }
 
-/**
- * A failure the user has to read. Given a container rather than left as loose red text, so it is
- * clearly a response to what they just did and not a permanent label on the form.
- */
 @Composable
 private fun ErrorBanner(error: AuthError) {
     Surface(

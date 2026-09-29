@@ -1,22 +1,9 @@
 package com.qure.app.screen
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,25 +17,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.qure.app.BuildConfig
 import com.qure.app.R
 import com.qure.app.account.UserProfile
 import com.qure.app.ui.theme.QrYellow
 import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.Spacing
+import com.qure.app.ui.component.BrandMark
+import com.qure.app.ui.component.InitialAvatar
+import com.qure.app.ui.component.TierChip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.ui.unit.dp
 
-/** The destinations reachable from the side menu. */
 enum class DrawerDestination { scanner, profile, myPage, cameraLink }
 
-/**
- * The side menu.
- *
- * Two things changed here beyond spacing. Signed out, the sheet used to show nothing at all above
- * the nav items — a blank header over a menu. It now offers a way in, because the only reason to
- * sign in is the thing the header is the natural place to mention. And the stock-camera entry is
- * separated from the three app destinations: it is a setting, not a place.
- */
 @Composable
 fun QureDrawerSheet(
     profile: UserProfile,
@@ -90,12 +84,6 @@ fun QureDrawerSheet(
     }
 }
 
-/**
- * Who is signed in — or an invitation, when nobody is.
- *
- * Tapping either state goes to the same destination, so the block is one target rather than a card
- * with a button inside it.
- */
 @Composable
 private fun IdentityBlock(profile: UserProfile, onSelect: (DrawerDestination) -> Unit) {
     Surface(

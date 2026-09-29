@@ -6,17 +6,6 @@ import com.qure.app.domain.Severity
 import com.qure.app.domain.Signal
 import com.qure.app.signature.Signature
 
-/**
- * Rules that need nothing but the shape of the URL itself. All offline, all instant.
- *
- * Each is its own object so it can be removed from the registry, disabled, or reordered without
- * touching any other rule.
- *
- * Every signal carries a short title and a one-line detail. The title is what a finding is called;
- * the detail is the specific fact about THIS payload. Neither ever contains a number of points.
- */
-
-/** The single highest-signal quishing pattern: everything before the at-sign is pure decoration. */
 object UserInfoSignature : Signature {
     override val id = "userinfo"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> {
@@ -74,7 +63,6 @@ object TransportSignature : Signature {
         } else emptyList()
 }
 
-/** Deep subdomains are how a bank name gets pasted in front of somebody else's domain. */
 class SubdomainDepthSignature(private val maxLabels: Int = 5) : Signature {
     override val id = "subdomainDepth"
     override suspend fun inspect(payload: ParsedPayload) =
@@ -106,7 +94,6 @@ class NonStandardPortSignature(
     }
 }
 
-/** Characters that let a payload paint something other than what it is. */
 object UnicodeTrickSignature : Signature {
     override val id = "unicodeTrick"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> = buildList {
@@ -140,7 +127,6 @@ object UnicodeTrickSignature : Signature {
     }
 }
 
-/** A URL is not the only payload that can hurt you. */
 object PayloadKindSignature : Signature {
     override val id = "payloadKind"
     override suspend fun inspect(payload: ParsedPayload): List<Signal> = when (payload.kind) {

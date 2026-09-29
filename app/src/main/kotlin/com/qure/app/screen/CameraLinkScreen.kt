@@ -4,58 +4,46 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.qure.app.R
-import com.qure.app.link.defaultBrowserRequestIntent
-import com.qure.app.link.isDefaultBrowser
 import com.qure.app.ui.theme.Motion
 import com.qure.app.ui.theme.QrYellow
 import com.qure.app.ui.theme.Radius
 import com.qure.app.ui.theme.RiskSafe
 import com.qure.app.ui.theme.Spacing
+import com.qure.app.ui.component.NoteCard
+import com.qure.app.ui.component.PrimaryButton
+import com.qure.app.ui.component.QureScaffold
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
+import com.qure.app.link.defaultBrowserRequestIntent
+import com.qure.app.link.isDefaultBrowser
 
-/**
- * Opt-in for reading QR codes that the PHONE'S OWN camera app finds.
- *
- * Reached from the scanner, never forced at first launch — see the note in MainActivity.
- *
- * The surprising part, and the reason this screen has to explain itself: there is no permission for
- * this. Android has no "let this app see the camera app's results" grant. The only supported hook
- * is the ACTION_VIEW intent the camera fires when the user taps its QR chip, and since Android 12
- * that intent does not reach non-browser apps at all — unverified web links go straight to the
- * default browser with no chooser. So the switch is the default-browser role, and only the user can
- * flip it.
- *
- * The screen now carries a status chip and the shared top bar. Previously the only way out was the
- * button at the very bottom of a scrolling page, which is a dead end on a small screen.
- */
 @Composable
 fun CameraLinkScreen(onClose: () -> Unit) {
     val context = LocalContext.current
@@ -65,8 +53,6 @@ fun CameraLinkScreen(onClose: () -> Unit) {
         ActivityResultContracts.StartActivityForResult()
     ) { isDefault = context.isDefaultBrowser() }
 
-    // The role dialog and the settings page both return without a useful result code on some
-    // devices, so re-read the real state whenever we come back to the foreground.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { isDefault = context.isDefaultBrowser() }
 
     QureScaffold(
@@ -124,7 +110,6 @@ fun CameraLinkScreen(onClose: () -> Unit) {
     }
 }
 
-/** Says plainly whether the link is live, so the page is readable without parsing the button. */
 @Composable
 private fun StatusChip(on: Boolean) {
     val tint by animateColorAsState(

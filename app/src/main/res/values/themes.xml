@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Parented on the platform Material theme so the app does not need the
-         com.google.android.material library just to have a window background. Compose paints
-         everything above this; the only job here is the pre-Compose window and the system bars. -->
     <style name="Theme.Qure" parent="android:Theme.Material.NoActionBar">
-        <!-- Dark from the very first frame: a white flash before the camera preview attaches is
-             the difference between "instant" and "janky" on a scanner. -->
         <item name="android:windowBackground">@color/qure_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
@@ -13,10 +8,6 @@
         <item name="android:windowLightNavigationBar">false</item>
     </style>
 
-    <!-- The stock-camera prompt. Translucent so the viewfinder underneath stays visible, which is
-         what makes the prompt read as an overlay on the camera rather than a jump to another app.
-         windowIsTranslucent also means an activity that finishes before composing shows nothing at
-         all, which is what keeps the pass-through path invisible. -->
     <style name="Theme.Qure.Transparent" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
@@ -27,14 +18,6 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
-    <!-- The launch window. Android 12+ draws the adaptive icon on a solid brand background instead
-         of the blank flash that used to stand between tapping the icon and the viewfinder.
-         Nothing new is drawn: it reuses @mipmap/ic_launcher and colours the app already ships.
-
-         Inherits Theme.Qure rather than restating it, so the activity keeps exactly the window
-         background and system-bar treatment it had before — the platform stops applying the splash
-         attributes once the first frame is drawn, and there is nothing else to hand back to. On API
-         30 and below the splash attributes are simply ignored and behaviour is unchanged. -->
     <style name="Theme.Qure.Splash" parent="Theme.Qure">
         <item name="android:windowSplashScreenBackground">@color/qure_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
