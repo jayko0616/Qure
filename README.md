@@ -1,41 +1,46 @@
 # Qure
 
-QR 피싱(quishing)을 잡는 안드로이드 어플리케이션
+An Android app that catches QR phishing (quishing).
 
-QR 코드는 사람 눈으로 목적지를 확인할 수 없다는 성질 때문에 피싱에 쓰입니다. Qure는 스캔한 주소를
-열기 **전에** 보여주고 검사합니다.
+A QR code hides its destination — the human eye cannot read where it leads. That property is
+exactly what makes it useful for phishing. Qure shows you the address and inspects it **before**
+it opens.
 
-## 바로 실행해 보기
+## Quick start
 
-**APK ▸ [`release/Qure-v0.1.0.apk`](release/Qure-v0.1.0.apk)** (23MB, 서명 완료)
+**APK ▸ [`release/Qure-v0.1.0.apk`](release/Qure-v0.1.0.apk)** (23 MB, signed)
 
-1. 위 파일을 안드로이드 기기(**Android 8.0 이상**)로 옮겨 실행하고, "출처를 알 수 없는 앱"
-   설치를 허용합니다.
-2. 첫 실행 시 **카메라 권한**을 허용합니다.
-3. PC에서 **[`release/test-qr.html`](release/test-qr.html)** 을 브라우저로 열고, 화면의 QR을
-   앱으로 비춥니다. 16종 각각에 기대되는 색·점수·발동 규칙이 함께 적혀 있습니다.
+1. Copy the file to an Android device (**Android 8.0 or newer**), open it, and allow installation
+   from unknown sources.
+2. Grant the **camera permission** on first launch.
+3. Open **[`release/test-qr.html`](release/test-qr.html)** in a browser on your computer and point
+   the app at the codes on screen. Each of the 16 codes is labelled with the verdict colour, score
+   and rule it is expected to trigger.
 
-시연 계정은 **ID `test` / PW `1234`** (Pro)입니다. 로그인 없이도 검사 기능은 전부 동작합니다.
+Demo account: **ID `test` / password `1234`** (Pro tier). Scanning and every safety check work
+without signing in at all.
 
-자세한 실행 시 유의점은 [`release/README.md`](release/README.md)에 있습니다.
+Full operating notes are in [`release/README.md`](release/README.md).
 
-## 두 개의 진입 경로
+## Two entry points
 
-**1. Qure 자체 스캐너** — 카메라를 비추면 QR을 추적하고, 인식되는 순간 검사 여부를 묻습니다.
+**1. Qure's own scanner** — point the camera, and the moment a code is recognised the app asks
+whether to inspect it.
 
-**2. 휴대폰 기본 카메라** — 삼성 카메라 등으로 찍은 QR의 링크를 누를 때 Qure가 먼저 확인합니다.
-Android 12+는 도메인 미검증 웹 링크를 기본 브라우저로 직행시키고 선택창을 띄우지 않으므로, 이 경로는
-Qure가 기본 브라우저 역할(`android.app.role.BROWSER`)을 가질 때만 동작합니다. 앱 안에서 사용자가
-직접 켜며, QR 출처가 아닌 링크는 화면 없이 즉시 브라우저로 통과시킵니다.
+**2. The phone's stock camera** — when you tap a link decoded by the Samsung camera or similar,
+Qure checks it first. Since Android 12 an unverified web link goes straight to the default browser
+with no chooser, so this path only works while Qure holds the default-browser role
+(`android.app.role.BROWSER`). The user enables it inside the app, and links that did not come from
+a QR code are passed straight through to the browser with no interruption.
 
-두 경로는 같은 파서·같은 검사 엔진·같은 결과 화면을 씁니다.
+Both paths share the same parser, the same detection engine and the same result screen.
 
-## 검사 규칙 추가하기
+## Adding a detection rule
 
-모든 탐지 로직은 [`signature/Signatures.kt`](app/src/main/kotlin/com/qure/app/signature/Signatures.kt)
-한 파일에서 관리합니다.
+Every detection lives in one file:
+[`signature/Signatures.kt`](app/src/main/kotlin/com/qure/app/signature/Signatures.kt).
 
-**악성 주소 추가** — 목록에 한 줄 넣으면 끝입니다.
+**To block an address**, add a line to the list:
 
 ```kotlin
 val blockedHosts: Set<String> = setOf(
@@ -43,7 +48,7 @@ val blockedHosts: Set<String> = setOf(
 )
 ```
 
-**새 탐지 기법 추가** — `Signature`를 구현하고 `rules`에 추가합니다.
+**To add a new technique**, implement `Signature` and register it in `rules`:
 
 ```kotlin
 object MySignature : Signature {
@@ -52,56 +57,57 @@ object MySignature : Signature {
 }
 ```
 
-`inspect()`는 `suspend`이므로 리다이렉트 추적, 평판 조회, LLM 호출을 넣어도 인터페이스가 바뀌지
-않습니다. 네트워크를 쓰는 규칙은 실패 시 **반드시 예외를 던져야** 합니다. 빈 목록을 반환하면
-"검사했고 아무것도 없었다"는 뜻이 되어, 타임아웃이 안전으로 읽힙니다.
+`inspect()` is `suspend`, so a rule may resolve redirects, query a reputation feed or call a model
+without the interface changing. A rule that uses the network **must throw on failure**. Returning
+an empty list claims "I looked and found nothing", which would let a timeout read as safe.
 
-## 2차 검사 — 실제 목적지 추적
+## Stage 2 — following the real destination
 
-단축 주소는 목적지를 숨기는 것이 존재 이유입니다. Qure는 1차(오프라인) 판정을 즉시 보여준 뒤,
-리다이렉트 체인을 따라가 **도착지를 같은 규칙으로 한 번 더 검사**합니다.
+A shortened link exists to hide where it goes. Qure shows the stage-1 (offline) verdict
+immediately, then follows the redirect chain and **runs the same rules again on wherever it lands**.
 
-`RedirectSignature`도 다른 규칙과 동일한 `Signature` 하나일 뿐이므로, 엔진의 집계·심각도 정책·
-실패 처리를 그대로 물려받습니다. 새로 만든 집계 로직은 없습니다.
+`RedirectSignature` is just another `Signature`, so it inherits the engine's aggregation, its
+severity policy and its failure handling. No new aggregation logic was written for it.
 
-추가로 잡는 것: 최종 목적지 호스트, 다단계 리다이렉트, **https→http 암호화 해제**, 추적 한도 초과.
+What stage 2 adds: the final destination host, multi-hop redirects, **https→http downgrades**, and
+chains that exceed the hop limit.
 
-`HEAD` 요청만 보내고 본문은 받지 않습니다. 다만 이 과정에서 **사용자 기기가 해당 주소로 직접
-접속**하므로 상대 서버가 IP와 접속 사실을 알 수 있습니다. 서버 경유 해석이 옳은 해법이며,
-백엔드가 생기면 `res/xml/network_security_config.xml`째로 제거하면 됩니다.
+Only `HEAD` is sent and the body is never read. Note the cost: resolving a chain contacts the
+destination **from the user's own phone**, which tells that server the device's IP and that
+somebody acted on the code. Resolving server-side is the correct fix; once a backend exists,
+`res/xml/network_security_config.xml` can be deleted along with it.
 
-
-## 기술 스택
+## Tech stack
 
 | | |
 |---|---|
-| 언어 / UI | Kotlin 2.2.10, Jetpack Compose (compose-bom 2026.08.00) |
-| 카메라 | CameraX 1.6.2 |
-| QR 디코딩 | ML Kit Barcode Scanning 17.3.0 (번들 모델, 오프라인 동작) |
-| 빌드 | AGP 9.2.1 / Gradle 9.4.1 |
+| Language / UI | Kotlin 2.2.10, Jetpack Compose (compose-bom 2026.08.00) |
+| Camera | CameraX 1.6.2 |
+| QR decoding | ML Kit Barcode Scanning 17.3.0 (bundled model, works offline) |
+| Build | AGP 9.2.1 / Gradle 9.4.1 |
 | SDK | compileSdk 37 · targetSdk 36 · **minSdk 26 (Android 8.0)** |
-| 네트워크 | `HttpURLConnection` (2차 검사 전용, 외부 라이브러리 없음) |
-| 테스트 | 단위 테스트 77개 |
+| Networking | `HttpURLConnection` only, for stage 2. No third-party HTTP library. |
+| Tests | 77 unit tests |
 
-의존성은 전부 [`gradle/libs.versions.toml`](gradle/libs.versions.toml)에 선언되어 있습니다.
+All dependencies are declared in
+[`gradle/libs.versions.toml`](gradle/libs.versions.toml).
 
-## 요구 사항
+## Requirements
 
 | | |
 |---|---|
-| JDK | **21** (Android Studio 내장 JBR 권장) |
-| Android SDK Platform | **37** (없으면 AGP가 자동 설치) |
-| Gradle | 9.4.1 — wrapper에 포함, 별도 설치 불필요 |
-| 기타 | 최초 빌드 시 의존성 다운로드를 위한 인터넷 연결 |
+| JDK | **21** (the JBR bundled with Android Studio works) |
+| Android SDK Platform | **37** (AGP installs it automatically if missing) |
+| Gradle | 9.4.1 — included in the wrapper, no separate install |
+| Other | An internet connection for the first dependency download |
 
-Gradle이 의존성을 자동으로 받으므로 별도로 설치할 패키지는 없습니다.
+Gradle resolves everything else, so there are no packages to install by hand.
 
-## 빌드
+## Build
 
-**Android Studio에서 열면** 별도 설정 없이 Run 하면 됩니다. 내장 JDK와 SDK 경로를 자동으로
-잡으므로 아래 환경 변수 설정이 필요하지 않습니다.
-
-명령줄로 빌드할 경우에만 두 경로를 지정합니다.
+**Opening the project in Android Studio and pressing Run needs no setup** — it picks up the bundled
+JDK and the SDK path on its own. The environment variables below are only needed for command-line
+builds.
 
 ```bash
 # macOS
@@ -115,7 +121,7 @@ export ANDROID_HOME="$HOME/Android/Sdk"
 ./gradlew :app:assembleDebug :app:testDebugUnitTest
 ```
 
-Windows(PowerShell)에서는 `gradlew.bat`을 쓰고 경로를 다음과 같이 지정합니다.
+On Windows (PowerShell), use `gradlew.bat`:
 
 ```powershell
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
@@ -124,9 +130,9 @@ $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest
 ```
 
-산출물은 `app/build/outputs/apk/debug/app-debug.apk`, 단위 테스트는 77개입니다.
+The output is `app/build/outputs/apk/debug/app-debug.apk`, and 77 unit tests run alongside it.
 
-### 서명된 릴리즈 APK
+### Signed release APK
 
 ```bash
 ./gradlew :app:assembleRelease
@@ -134,46 +140,38 @@ $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
 BT="$ANDROID_HOME/build-tools/37.0.0"
 "$BT/zipalign" -p -f 4 \
   app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-"$BT/apksigner" sign --ks <키스토어> --out Qure.apk aligned.apk
+"$BT/apksigner" sign --ks <keystore> --out Qure.apk aligned.apk
 ```
 
-`assembleRelease`의 산출물은 **서명되지 않은 APK**라 그대로는 설치되지 않습니다.
-배포본은 [`release/`](release/) 폴더에 서명을 마친 상태로 들어 있습니다.
+`assembleRelease` produces an **unsigned** APK, which will not install as-is. The build in
+[`release/`](release/) is already signed.
 
-## 버전 제약
+## Version constraints
 
-아래는 전부 실제로 빌드를 깨뜨렸던 항목입니다. 바꾸기 전에 읽으십시오.
+Every item below has broken the build before. Read it before changing any of them.
 
-**`org.jetbrains.kotlin.android` 플러그인을 적용하면 안 됩니다.**
-AGP 9.2.1이 Kotlin 2.2.10을 내장하고 자체 `kotlin` 확장을 등록하므로,
-KGP를 얹으면 `Cannot add extension with name 'kotlin'`으로 실패합니다.
+**Do not apply the `org.jetbrains.kotlin.android` plugin.**
+AGP 9.2.1 embeds Kotlin 2.2.10 and registers its own `kotlin` extension, so adding KGP on top
+fails with `Cannot add extension with name 'kotlin'`.
 
-**`compileSdk`는 37이어야 합니다.**
-compose-bom 2026.08.00이 Compose UI 1.12.0을 고정하고, 그 AAR 메타데이터가 API 37 컴파일을
-요구합니다. 36으로 낮추면 `:app:checkDebugAarMetadata`에서 실패하는데,
-`compileDebugKotlin`이 먼저 통과하기 때문에 원인과 무관해 보이는 지점에서 터집니다.
+**`compileSdk` must be 37.**
+compose-bom 2026.08.00 pins Compose UI 1.12.0, whose AAR metadata requires compiling against
+API 37. Dropping to 36 fails at `:app:checkDebugAarMetadata` — a failure that looks unrelated,
+because `compileDebugKotlin` passes first.
 
-**`java { toolchain { 21 } }` 블록은 필수입니다.**
-없으면 AGP가 JDK 17 toolchain을 요구하고, 이 프로젝트에는 toolchain 다운로드 저장소가
-설정되어 있지 않아 `compileDebugJavaWithJavac` 태스크가 생성조차 되지 않습니다.
-`compileOptions`만 맞춰서는 해결되지 않습니다.
+**The `java { toolchain { 21 } }` block is mandatory.**
+Without it AGP asks Gradle for a JDK 17 toolchain, and this project has no toolchain download
+repository configured, so `compileDebugJavaWithJavac` cannot even be created. Setting
+`compileOptions` alone does not fix it.
 
-**`targetSdk`는 명시적으로 36입니다.**
-AGP 9는 미지정 시 `targetSdk`를 `compileSdk`로 따라가게 하므로, 생략하면 `compileSdk`를
-올리는 순간 조용히 Android 17 동작 변경에 편입됩니다.
+**`targetSdk` is declared explicitly as 36.**
+AGP 9 silently defaults `targetSdk` to `compileSdk`, so omitting it would opt the app into the next
+platform's behaviour changes the moment `compileSdk` moves.
 
-**ML Kit은 번들 모델입니다.**
-`play-services` 변형이 아니라 모델을 APK에 포함하는 쪽이라, 통신이 꺼져 있어도 디코딩이
-됩니다. 대신 APK가 약 21MB 커집니다.
+**ML Kit uses the bundled model.**
+This is not the `play-services` variant: the model ships inside the APK, so decoding works with the
+radios off. It costs about 21 MB of APK size.
 
-**저장소 선언은 `settings.gradle.kts`에만 둡니다.**
-`FAIL_ON_PROJECT_REPOS`가 설정되어 있어 루트 빌드 파일에 `allprojects { repositories { } }`를
-추가하면 빌드가 실패합니다.
-
-## 현재 범위
-
-1차 검사는 **QR에 적힌 내용만으로** 판단하는 오프라인 검사이고, 2차 검사가 최종 목적지를
-추적합니다. 도메인 평판 조회는 아직 연결되지 않았습니다.
-
-계정과 요금제는 기기 로컬 저장이며 서버 인증이 없습니다. 유료 기능을 실제로 과금하려면
-권한 검증이 서버로 가야 합니다 — 기기에만 있는 등급은 표시용 힌트일 뿐입니다.
+**Repositories are declared only in `settings.gradle.kts`.**
+`FAIL_ON_PROJECT_REPOS` is set, so adding `allprojects { repositories { ... } }` to the root build
+file fails the build.
